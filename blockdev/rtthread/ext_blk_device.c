@@ -18,13 +18,12 @@
  */
 
 #include <rtthread.h>
-#include <rtdef.h>
 #include <dfs.h>
 #include <dfs_fs.h>
 #include <dfs_file.h>
 #include <ext4.h>
 #include <ext4_debug.h>
-#include <ext_blk_device.h>
+#include "ext_blk_device.h"
 #include <stdint.h>
 
 static struct lwext4_part
@@ -75,7 +74,7 @@ static int blockdev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id
     }
     else
     {
-        result = -EIO;
+        result = -RT_EIO;
     }
 
     return result;
@@ -98,7 +97,7 @@ static int blockdev_bwrite(struct ext4_blockdev *bdev, const void *buf,
     }
     else
     {
-        result = -EIO;
+        result = -RT_EIO;
     }
 
     return result;

@@ -21,12 +21,12 @@
 
 #include "dfs_ext.h"
 
-#include "ext4.h"
-#include "ext4_mkfs.h"
-#include "ext4_config.h"
-#include "ext4_blockdev.h"
-#include "ext4_errno.h"
-#include "ext4_mbr.h"
+#include <ext4.h>
+#include <ext4_mkfs.h>
+#include <ext4_config.h>
+#include <ext4_blockdev.h>
+#include <ext4_errno.h>
+#include <ext4_mbr.h>
 
 static int blockdev_open(struct ext4_blockdev *bdev);
 static int blockdev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id,
@@ -116,7 +116,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     if (index == -1)
     {
         rt_kprintf("dfs_ext_mount: get an empty position.\n");
-        return -ENOENT;
+        return -RT_EINVAL;
     }
 
     lwext4_init(fs->dev_id);
@@ -131,13 +131,13 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     }
 
     rc = ext4_device_register(ext4_blkdev_list[index], img);
-    if(EOK == rc)
+    if(RT_EOK == rc)
     {
         disk[index] = fs->dev_id;
 
         rc = ext4_mount(img, fs->path, false);
 
-        if(EOK != rc)
+        if(RT_EOK != rc)
         {
             disk[index] = NULL;
             rc = -rc;
@@ -161,7 +161,7 @@ static int dfs_ext_unmount(struct dfs_filesystem* fs)
     /* find the device index and then umount it */
     index = get_disk(fs->dev_id);
     if (index == -1) /* not found */
-        return -ENOENT;
+        return -RT_EINVAL;
 
     rc = ext4_umount(mp);
 
@@ -181,17 +181,17 @@ static int dfs_ext_mkfs(rt_device_t devid)
 
     if (devid == RT_NULL)
     {
-        return -EINVAL;
+        return -RT_EINVAL;
     }
 
     /* find the device index, already mount */
     index = get_disk(devid);
     if (index != -1)
-        return -EBUSY;
+        return -RT_EBUSY;
 
     index = get_disk(RT_NULL);
     if (index == -1) /* not found */
-        return -ENOSPC;
+        return -RT_EINVAL;
 
     rc = ext4_device_register(ext4_blkdev_list[index], img);
     if(EOK == rc)
@@ -251,7 +251,7 @@ static int dfs_ext_flush(struct dfs_fd *fd)
 {
     (void)fd;
 
-    return -ENOTSUP;
+    return -RT_ENOSYS;
 }
 
 static int dfs_ext_lseek(struct dfs_fd* file, rt_off_t offset)
@@ -392,7 +392,7 @@ static int dfs_ext_getdents(struct dfs_fd* file, struct dirent* dirp, rt_uint32_
     /* make integer count */
     count = (count / sizeof(struct dirent)) * sizeof(struct dirent);
     if (count == 0)
-        return -EINVAL;
+        return -RT_EINVAL;
 
     index = 0;
     while (1)
@@ -530,7 +530,7 @@ static int blockdev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id
     }
     else
     {
-        result = -EIO;
+        result = -RT_EIO;
     }
 
     return result;
@@ -556,7 +556,7 @@ static int blockdev_bwrite(struct ext4_blockdev *bdev, const void *buf,
     }
     else
     {
-        result = -EIO;
+        result = -RT_EIO;
     }
 
     return result;
