@@ -269,8 +269,7 @@ static int dfs_ext_close(struct dfs_fd* file)
 
 #ifdef RT_USING_SMART
     if (file->fnode->type == FT_DIRECTORY)
-#endif
-#ifdef RT_USING_THREAD
+#else
     if (file->type == FT_DIRECTORY)
 #endif
     {
@@ -300,8 +299,7 @@ static int dfs_ext_open(struct dfs_fd* file)
         {
 #ifdef RT_USING_SMART
             r = ext4_dir_mk(file->fnode->path);
-#endif
-#ifdef RT_USING_THREAD
+#else
             r = ext4_dir_mk(file->path);
 #endif
         }
@@ -310,8 +308,7 @@ static int dfs_ext_open(struct dfs_fd* file)
             dir = rt_malloc(sizeof(ext4_dir));
 #ifdef RT_USING_SMART
             r = ext4_dir_open(dir, file->fnode->path);
-#endif
-#ifdef RT_USING_THREAD
+#else
             r = ext4_dir_open(dir, file->path);
 #endif
             if(EOK == r)
@@ -329,8 +326,7 @@ static int dfs_ext_open(struct dfs_fd* file)
         f = rt_malloc(sizeof(ext4_file));
 #ifdef RT_USING_SMART
         r = ext4_fopen2(f, file->fnode->path, file->flags);
-#endif
-#ifdef RT_USING_THREAD
+#else
         r = ext4_fopen2(f, file->path, file->flags);
 #endif
 
