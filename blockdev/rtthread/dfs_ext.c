@@ -8,6 +8,7 @@
  * 2017-11-11     parai@foxmail.com base porting
  * 2018-06-02     parai@foxmail.com fix mkfs issues
  * 2020-08-19     lizhirui          porting to ls2k
+ * 2021-07-09     linzhenxing       modify for art pi smart
  */
 
 #include <rtthread.h>
@@ -16,7 +17,7 @@
 #include <dfs_fs.h>
 #include <dfs_file.h>
 
-#include <blk_device.h>
+#include <ext_blk_device.h>
 
 #include "dfs_ext.h"
 
@@ -108,7 +109,6 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     int rc;
     int index;
     long partid = (long)data;
-    char* mp = fs->path; /*mount point */
     char* img = fs->dev_id->parent.name;
 
     /* get an empty position */
@@ -119,10 +119,10 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
         return -ENOENT;
     }
 
+    lwext4_init(fs->dev_id);
     if(partid >= 0 && partid <= 3)
     {
-        ext4_blkdev_list[index]->part_offset = ((struct blk_device *)fs->dev_id)->ext4_partition.partitions[partid].part_offset;
-        ext4_blkdev_list[index]->part_size = ((struct blk_device *)fs->dev_id)->ext4_partition.partitions[partid].part_size;
+        get_partition(partid, ext4_blkdev_list[index]);
     }
     else
     {
@@ -142,7 +142,12 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
             disk[index] = NULL;
             rc = -rc;
             ext4_device_unregister(img);
+            rt_kprintf("ext4 mount fail!(%d)\n",rc);
         }
+    }
+    else
+    {
+        rt_kprintf("device register fail(%d)!\n",rc);
     }
 
     return rc;
@@ -261,7 +266,12 @@ static int dfs_ext_lseek(struct dfs_fd* file, rt_off_t offset)
 static int dfs_ext_close(struct dfs_fd* file)
 {
     int r;
+
+#ifdef RT_USING_SMART
+    if (file->fnode->type == FT_DIRECTORY)
+#else
     if (file->type == FT_DIRECTORY)
+#endif
     {
         r = ext4_fclose(file->data);
         rt_free(file->data);
@@ -287,12 +297,20 @@ static int dfs_ext_open(struct dfs_fd* file)
     {
         if (file->flags & O_CREAT)
         {
+#ifdef RT_USING_SMART
+            r = ext4_dir_mk(file->fnode->path);
+#else
             r = ext4_dir_mk(file->path);
+#endif
         }
         if(EOK == r)
         {
             dir = rt_malloc(sizeof(ext4_dir));
+#ifdef RT_USING_SMART
+            r = ext4_dir_open(dir, file->fnode->path);
+#else
             r = ext4_dir_open(dir, file->path);
+#endif
             if(EOK == r)
             {
                 file->data = dir;
@@ -306,7 +324,13 @@ static int dfs_ext_open(struct dfs_fd* file)
     else
     {
         f = rt_malloc(sizeof(ext4_file));
+#ifdef RT_USING_SMART
+        r = ext4_fopen2(f, file->fnode->path, file->flags);
+#else
         r = ext4_fopen2(f, file->path, file->flags);
+#endif
+
+
         if(EOK == r)
         {
             file->data = f;
@@ -319,7 +343,7 @@ static int dfs_ext_open(struct dfs_fd* file)
     return -r;
 }
 
-static int dfs_ext_unlink   (struct dfs_filesystem *fs, const char *pathname)
+static int dfs_ext_unlink(struct dfs_filesystem *fs, const char *pathname)
 {
     int r;
 
@@ -456,7 +480,6 @@ INIT_COMPONENT_EXPORT(dfs_ext_init);
 static int blockdev_open(struct ext4_blockdev *bdev)
 {
     int r;
-    uint32_t size;
     int index = get_bdev(bdev);
     rt_device_t device = disk[index];
     struct rt_device_blk_geometry geometry;
@@ -480,7 +503,7 @@ static int blockdev_open(struct ext4_blockdev *bdev)
             bdev->part_offset = 0;
             bdev->part_size = geometry.sector_count*geometry.bytes_per_sector;
         }
-
+        bdev->bdif->ph_bsize = geometry.block_size;
         disk_sector_size[index] = geometry.bytes_per_sector;
         bdev->bdif->ph_bcnt = bdev->part_size / bdev->bdif->ph_bsize;
     }
@@ -495,7 +518,6 @@ static int blockdev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id
     int result;
     int index = get_bdev(bdev);
     rt_device_t device = disk[index];
-    struct blk_device *blk = (struct blk_device *)device;
     RT_ASSERT(index < RT_DFS_EXT_DRIVES);
     RT_ASSERT(device);
 
