@@ -21,12 +21,19 @@
 
 #include "dfs_ext.h"
 
-#include <ext4.h>
-#include <ext4_mkfs.h>
-#include <ext4_config.h>
-#include <ext4_blockdev.h>
-#include <ext4_errno.h>
-#include <ext4_mbr.h>
+#include "ext4.h"
+#include "ext4_mkfs.h"
+#include "ext4_config.h"
+#include "ext4_blockdev.h"
+#include "ext4_errno.h"
+#include "ext4_mbr.h"
+#include "ext4_super.h"
+
+#define DBG_TAG               "dfs_ext"
+#define DBG_LVL               DBG_INFO
+
+#include <rtdbg.h>
+
 
 static int blockdev_open(struct ext4_blockdev *bdev);
 static int blockdev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id,
@@ -76,6 +83,40 @@ static struct ext4_blockdev * const ext4_blkdev_list[RT_DFS_EXT_DRIVES] =
     &ext4_blkdev3,
 #endif
 };
+
+static rt_mutex_t ext_mutex = RT_NULL;
+static rt_mutex_t ext4_mutex = RT_NULL;
+static void ext_lock(void);
+static void ext_unlock(void);
+
+static struct ext4_lock ext4_lock_ops =
+{
+    ext_lock,
+    ext_unlock
+};
+
+static void ext_lock(void)
+{
+    rt_err_t result = -RT_EBUSY;
+
+    while (result == -RT_EBUSY)
+    {
+        result = rt_mutex_take(ext4_mutex, RT_WAITING_FOREVER);
+    }
+
+    if (result != RT_EOK)
+    {
+        RT_ASSERT(0);
+    }
+    return ;
+}
+
+static void ext_unlock(void)
+{
+    rt_mutex_release(ext4_mutex);
+    return ;
+}
+
 static int get_disk(rt_device_t id)
 {
     int index;
@@ -111,11 +152,24 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     long partid = (long)data;
     char* img = fs->dev_id->parent.name;
 
+    ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+    if (ext_mutex == RT_NULL)
+    {
+        LOG_E("create lwext mutex failed.\n");
+        return -1;
+    }
+    ext4_mutex = rt_mutex_create("lwext4",RT_IPC_FLAG_FIFO);
+    if (ext4_mutex == RT_NULL)
+    {
+        LOG_E("create lwext4 mutex failed.\n");
+        return -1;
+    }
+
     /* get an empty position */
     index = get_disk(RT_NULL);
     if (index == -1)
     {
-        rt_kprintf("dfs_ext_mount: get an empty position.\n");
+        LOG_E("dfs_ext_mount: get an empty position.\n");
         return -RT_EINVAL;
     }
 
@@ -126,7 +180,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     }
     else
     {
-        rt_kprintf("dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
+        LOG_E("dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
         ext4_blkdev_list[index]->part_offset = -1;
     }
 
@@ -142,12 +196,15 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
             disk[index] = NULL;
             rc = -rc;
             ext4_device_unregister(img);
-            rt_kprintf("ext4 mount fail!(%d)\n",rc);
+            LOG_E("ext4 mount fail!(%d)\n",rc);
         }
+
+        ext4_mount_setup_locks(fs->path, &ext4_lock_ops);
+
     }
     else
     {
-        rt_kprintf("device register fail(%d)!\n",rc);
+        LOG_E("device register fail(%d)!\n",rc);
     }
 
     return rc;
@@ -214,6 +271,23 @@ static int dfs_ext_mkfs(rt_device_t devid)
     return rc;
 }
 
+static int dfs_ext_statfs(struct dfs_filesystem *fs, struct statfs *buf)
+{
+    struct ext4_sblock *sb = NULL;
+    int error = RT_EOK;
+
+    error = ext4_get_sblock(fs->path, &sb);
+    if(error != RT_EOK)
+    {
+        return -error;
+    }
+
+    buf->f_bsize = ext4_sb_get_block_size(sb);
+    buf->f_blocks = ext4_sb_get_blocks_cnt(sb);
+    buf->f_bfree = ext4_sb_get_free_blocks_cnt(sb);
+    return error;
+
+}
 static int dfs_ext_ioctl(struct dfs_fd* file, int cmd, void* args)
 {
     return -RT_EIO;
@@ -249,9 +323,14 @@ static int dfs_ext_write(struct dfs_fd *fd, const void *buf, size_t count)
 
 static int dfs_ext_flush(struct dfs_fd *fd)
 {
-    (void)fd;
+    int error = RT_EOK;
+    error = ext4_cache_flush(fd->fnode->path);
+    if(error != RT_EOK)
+    {
+        return -error;
+    }
 
-    return -RT_ENOSYS;
+    return error;
 }
 
 static int dfs_ext_lseek(struct dfs_fd* file, rt_off_t offset)
@@ -460,7 +539,7 @@ static const struct dfs_filesystem_ops _ext_fs =
     dfs_ext_mount,
     dfs_ext_unmount,
     dfs_ext_mkfs,
-    NULL, /* statfs */
+    dfs_ext_statfs, /* statfs */
 
     dfs_ext_unlink,
     dfs_ext_stat,
@@ -578,10 +657,22 @@ static int blockdev_close(struct ext4_blockdev *bdev)
 
 static int blockdev_lock(struct ext4_blockdev *bdev)
 {
+    rt_err_t result = -RT_EBUSY;
+
+    while (result == -RT_EBUSY)
+    {
+        result = rt_mutex_take(ext_mutex, RT_WAITING_FOREVER);
+    }
+
+    if (result != RT_EOK)
+    {
+        RT_ASSERT(0);
+    }
     return 0;
 }
 
 static int blockdev_unlock(struct ext4_blockdev *bdev)
 {
+    rt_mutex_release(ext_mutex);
     return 0;
 }
