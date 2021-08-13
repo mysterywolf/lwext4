@@ -29,6 +29,12 @@
 #include "ext4_mbr.h"
 #include "ext4_super.h"
 
+#define DBG_TAG               "dfs_ext"
+#define DBG_LVL               DBG_INFO
+
+#include <rtdbg.h>
+
+
 static int blockdev_open(struct ext4_blockdev *bdev);
 static int blockdev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id,
              uint32_t blk_cnt);
@@ -149,13 +155,13 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
     if (ext_mutex == RT_NULL)
     {
-        printf("create lwext mutex failed.\n");
+        LOG_E("create lwext mutex failed.\n");
         return -1;
     }
     ext4_mutex = rt_mutex_create("lwext4",RT_IPC_FLAG_FIFO);
     if (ext4_mutex == RT_NULL)
     {
-        printf("create lwext4 mutex failed.\n");
+        LOG_E("create lwext4 mutex failed.\n");
         return -1;
     }
 
@@ -163,7 +169,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     index = get_disk(RT_NULL);
     if (index == -1)
     {
-        rt_kprintf("dfs_ext_mount: get an empty position.\n");
+        LOG_E("dfs_ext_mount: get an empty position.\n");
         return -RT_EINVAL;
     }
 
@@ -174,7 +180,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     }
     else
     {
-        rt_kprintf("dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
+        LOG_E("dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
         ext4_blkdev_list[index]->part_offset = -1;
     }
 
@@ -190,7 +196,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
             disk[index] = NULL;
             rc = -rc;
             ext4_device_unregister(img);
-            rt_kprintf("ext4 mount fail!(%d)\n",rc);
+            LOG_E("ext4 mount fail!(%d)\n",rc);
         }
 
         ext4_mount_setup_locks(fs->path, &ext4_lock_ops);
@@ -198,7 +204,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     }
     else
     {
-        rt_kprintf("device register fail(%d)!\n",rc);
+        LOG_E("device register fail(%d)!\n",rc);
     }
 
     return rc;

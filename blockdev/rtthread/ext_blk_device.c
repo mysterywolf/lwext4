@@ -25,6 +25,10 @@
 #include <ext4_debug.h>
 #include "ext_blk_device.h"
 #include <stdint.h>
+#define DBG_TAG               "ext_blk_device"
+#define DBG_LVL               DBG_INFO
+
+#include <rtdbg.h>
 
 static struct lwext4_part
 {
@@ -135,7 +139,7 @@ void lwext4_init(rt_device_t mbr_device)
 
     if (ext4_mbr_scan(&bdev, &_part) != EOK)
     {
-        rt_kprintf("MBR scan failed!\n");
+        LOG_E("MBR scan failed!\n");
         return;
     }
 }
