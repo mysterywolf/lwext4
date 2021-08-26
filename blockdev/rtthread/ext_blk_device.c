@@ -25,6 +25,7 @@
 #include <ext4_debug.h>
 #include "ext_blk_device.h"
 #include <stdint.h>
+#include "ext4_mbr.h"
 #define DBG_TAG               "ext_blk_device"
 #define DBG_LVL               DBG_INFO
 
@@ -137,7 +138,7 @@ void lwext4_init(rt_device_t mbr_device)
 {
     _mbr_device = mbr_device;
 
-    if (ext4_mbr_scan(&bdev, &_part) != EOK)
+    if (ext4_mbr_scan(&bdev, (struct ext4_mbr_bdevs *)&_part) != EOK)
     {
         LOG_E("MBR scan failed!\n");
         return;
