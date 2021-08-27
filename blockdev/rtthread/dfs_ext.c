@@ -13,6 +13,7 @@
 
 #include <rtthread.h>
 #include <rtdef.h>
+#include <string.h>
 #include <dfs.h>
 #include <dfs_fs.h>
 #include <dfs_file.h>
@@ -225,7 +226,7 @@ static int dfs_ext_unmount(struct dfs_filesystem* fs)
     return rc;
 }
 
-static int dfs_ext_mkfs(rt_device_t devid)
+static int dfs_ext_mkfs(rt_device_t devid, const char *fs_name)
 {
     int  index;
     int rc;
@@ -290,6 +291,13 @@ static int dfs_ext_statfs(struct dfs_filesystem *fs, struct statfs *buf)
 }
 static int dfs_ext_ioctl(struct dfs_fd* file, int cmd, void* args)
 {
+	switch (cmd)
+    {
+	case F_GETLK:
+            return 0;
+    case F_SETLK:
+            return 0;
+    }
     return -RT_EIO;
 }
 
@@ -324,7 +332,11 @@ static int dfs_ext_write(struct dfs_fd *fd, const void *buf, size_t count)
 static int dfs_ext_flush(struct dfs_fd *fd)
 {
     int error = RT_EOK;
+#ifdef RT_USING_SMART
     error = ext4_cache_flush(fd->fnode->path);
+#else
+    error = ext4_cache_flush(fd->path);
+#endif
     if(error != RT_EOK)
     {
         return -error;
@@ -333,11 +345,11 @@ static int dfs_ext_flush(struct dfs_fd *fd)
     return error;
 }
 
-static int dfs_ext_lseek(struct dfs_fd* file, rt_off_t offset)
+static int dfs_ext_lseek(struct dfs_fd* file, off_t offset)
 {
     int r;
 
-    r = ext4_fseek(file->data, offset, SEEK_SET);
+    r = ext4_fseek(file->data, (int64_t)offset, SEEK_SET);
 
     return -r;
 }
@@ -413,6 +425,14 @@ static int dfs_ext_open(struct dfs_fd* file)
         if(EOK == r)
         {
             file->data = f;
+#ifdef RT_USING_SMART			
+            file->fnode->flags = f->flags;
+			file->pos = f->fpos;
+			file->fnode->size = (size_t)f->fsize;   
+#else
+			file->pos = f->fpos;
+			file->size = (size_t)f->fsize; 			
+#endif
         }
         else
         {
@@ -481,7 +501,7 @@ static int dfs_ext_getdents(struct dfs_fd* file, struct dirent* dirp, rt_uint32_
         rentry = ext4_dir_entry_next(file->data);
         if(NULL != rentry)
         {
-            strncpy(d->d_name, rentry->name, DFS_PATH_MAX);
+            strncpy(d->d_name, (char *)rentry->name, DFS_PATH_MAX);
             if(EXT4_DE_DIR == rentry->inode_type)
             {
                 d->d_type = DT_DIR;
@@ -559,7 +579,7 @@ INIT_COMPONENT_EXPORT(dfs_ext_init);
 static int blockdev_open(struct ext4_blockdev *bdev)
 {
     int r;
-    int index = get_bdev(bdev);
+    uint8_t index = get_bdev(bdev);
     rt_device_t device = disk[index];
     struct rt_device_blk_geometry geometry;
 
@@ -595,7 +615,7 @@ static int blockdev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id
              uint32_t blk_cnt)
 {
     int result;
-    int index = get_bdev(bdev);
+    uint8_t index = get_bdev(bdev);
     rt_device_t device = disk[index];
     RT_ASSERT(index < RT_DFS_EXT_DRIVES);
     RT_ASSERT(device);
@@ -620,7 +640,7 @@ static int blockdev_bwrite(struct ext4_blockdev *bdev, const void *buf,
               uint64_t blk_id, uint32_t blk_cnt)
 {
     int result;
-    int index = get_bdev(bdev);
+    uint8_t index = get_bdev(bdev);
     rt_device_t device = disk[index];
 
     RT_ASSERT(index < RT_DFS_EXT_DRIVES);
@@ -644,7 +664,7 @@ static int blockdev_bwrite(struct ext4_blockdev *bdev, const void *buf,
 static int blockdev_close(struct ext4_blockdev *bdev)
 {
     int result;
-    int index = get_bdev(bdev);
+    uint8_t index = get_bdev(bdev);
     rt_device_t device = disk[index];
 
     RT_ASSERT(index < RT_DFS_EXT_DRIVES);
