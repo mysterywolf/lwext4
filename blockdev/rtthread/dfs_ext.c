@@ -600,8 +600,8 @@ static int blockdev_open(struct ext4_blockdev *bdev)
         if(bdev->part_offset == -1)
         {
             bdev->part_offset = 0;
-            bdev->part_size = geometry.sector_count*geometry.bytes_per_sector;
         }
+		bdev->part_size = geometry.sector_count*geometry.bytes_per_sector;
         bdev->bdif->ph_bsize = geometry.block_size;
         disk_sector_size[index] = geometry.bytes_per_sector;
         bdev->bdif->ph_bcnt = bdev->part_size / bdev->bdif->ph_bsize;
@@ -677,22 +677,10 @@ static int blockdev_close(struct ext4_blockdev *bdev)
 
 static int blockdev_lock(struct ext4_blockdev *bdev)
 {
-    rt_err_t result = -RT_EBUSY;
-
-    while (result == -RT_EBUSY)
-    {
-        result = rt_mutex_take(ext_mutex, RT_WAITING_FOREVER);
-    }
-
-    if (result != RT_EOK)
-    {
-        RT_ASSERT(0);
-    }
     return 0;
 }
 
 static int blockdev_unlock(struct ext4_blockdev *bdev)
 {
-    rt_mutex_release(ext_mutex);
     return 0;
 }
