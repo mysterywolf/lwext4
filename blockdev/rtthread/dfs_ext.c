@@ -153,18 +153,24 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     long partid = (long)data;
     char* img = fs->dev_id->parent.name;
 
-    ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
-    if (ext_mutex == RT_NULL)
-    {
-        LOG_E("create lwext mutex failed.\n");
-        return -1;
-    }
-    ext4_mutex = rt_mutex_create("lwext4",RT_IPC_FLAG_FIFO);
-    if (ext4_mutex == RT_NULL)
-    {
-        LOG_E("create lwext4 mutex failed.\n");
-        return -1;
-    }
+	if (ext_mutex == RT_NULL)
+	{
+		ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+	    if (ext_mutex == RT_NULL)
+	    {
+	        LOG_E("create lwext mutex failed.\n");
+	        return -1;
+	    }
+	}
+	if (ext4_mutex == RT_NULL)
+	{
+		ext4_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+	    if (ext4_mutex == RT_NULL)
+	    {
+	        LOG_E("create lwext mutex failed.\n");
+	        return -1;
+	    }
+	}
 
     /* get an empty position */
     index = get_disk(RT_NULL);
@@ -236,6 +242,24 @@ static int dfs_ext_mkfs(rt_device_t devid, const char *fs_name)
         .journal = true,
     };
     char* img = devid->parent.name;
+	if (ext_mutex == RT_NULL)
+	{
+		ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+	    if (ext_mutex == RT_NULL)
+	    {
+	        LOG_E("create lwext mutex failed.\n");
+	        return -1;
+	    }
+	}
+	if (ext4_mutex == RT_NULL)
+	{
+		ext4_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+	    if (ext4_mutex == RT_NULL)
+	    {
+	        LOG_E("create lwext mutex failed.\n");
+	        return -1;
+	    }
+	}
 
     if (devid == RT_NULL)
     {
@@ -677,10 +701,22 @@ static int blockdev_close(struct ext4_blockdev *bdev)
 
 static int blockdev_lock(struct ext4_blockdev *bdev)
 {
+	rt_err_t result = -RT_EBUSY;
+
+    while (result == -RT_EBUSY)
+    {
+        result = rt_mutex_take(ext_mutex, RT_WAITING_FOREVER);
+    }
+
+    if (result != RT_EOK)
+    {
+        RT_ASSERT(0);
+    }
     return 0;
 }
 
 static int blockdev_unlock(struct ext4_blockdev *bdev)
 {
+	rt_mutex_release(ext_mutex);
     return 0;
 }
