@@ -291,9 +291,9 @@ static int dfs_ext_statfs(struct dfs_filesystem *fs, struct statfs *buf)
 }
 static int dfs_ext_ioctl(struct dfs_fd* file, int cmd, void* args)
 {
-	switch (cmd)
+    switch (cmd)
     {
-	case F_GETLK:
+    case F_GETLK:
             return 0;
     case F_SETLK:
             return 0;
@@ -425,13 +425,13 @@ static int dfs_ext_open(struct dfs_fd* file)
         if(EOK == r)
         {
             file->data = f;
-#ifdef RT_USING_SMART			
+#ifdef RT_USING_SMART
             file->fnode->flags = f->flags;
-			file->pos = f->fpos;
-			file->fnode->size = (size_t)f->fsize;   
+            file->pos = f->fpos;
+            file->fnode->size = (size_t)f->fsize;
 #else
-			file->pos = f->fpos;
-			file->size = (size_t)f->fsize; 			
+            file->pos = f->fpos;
+            file->size = (size_t)f->fsize;
 #endif
         }
         else
