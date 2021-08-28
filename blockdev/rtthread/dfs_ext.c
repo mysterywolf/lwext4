@@ -153,24 +153,24 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     long partid = (long)data;
     char* img = fs->dev_id->parent.name;
 #ifdef RT_USING_SMART
-	if (ext_mutex == RT_NULL)
-	{
-		ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
-	    if (ext_mutex == RT_NULL)
-	    {
-	        LOG_E("create lwext mutex failed.\n");
-	        return -1;
-	    }
-	}
-	if (ext4_mutex == RT_NULL)
-	{
-		ext4_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
-	    if (ext4_mutex == RT_NULL)
-	    {
-	        LOG_E("create lwext mutex failed.\n");
-	        return -1;
-	    }
-	}
+    if (ext_mutex == RT_NULL)
+    {
+        ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+        if (ext_mutex == RT_NULL)
+        {
+            LOG_E("create lwext mutex failed.\n");
+            return -1;
+        }
+    }
+    if (ext4_mutex == RT_NULL)
+    {
+        ext4_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+        if (ext4_mutex == RT_NULL)
+        {
+            LOG_E("create lwext mutex failed.\n");
+            return -1;
+        }
+    }
 #endif
     /* get an empty position */
     index = get_disk(RT_NULL);
@@ -205,8 +205,8 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
             ext4_device_unregister(img);
             LOG_E("ext4 mount fail!(%d)\n",rc);
         }
-#ifdef RT_USING_SMART		
-		ext4_mount_setup_locks(fs->path, &ext4_lock_ops);
+#ifdef RT_USING_SMART
+        ext4_mount_setup_locks(fs->path, &ext4_lock_ops);
 #endif
     }
     else
@@ -243,24 +243,24 @@ static int dfs_ext_mkfs(rt_device_t devid, const char *fs_name)
     };
     char* img = devid->parent.name;
 #ifdef RT_USING_SMART
-	if (ext_mutex == RT_NULL)
-	{
-		ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
-	    if (ext_mutex == RT_NULL)
-	    {
-	        LOG_E("create lwext mutex failed.\n");
-	        return -1;
-	    }
-	}
-	if (ext4_mutex == RT_NULL)
-	{
-		ext4_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
-	    if (ext4_mutex == RT_NULL)
-	    {
-	        LOG_E("create lwext mutex failed.\n");
-	        return -1;
-	    }
-	}
+    if (ext_mutex == RT_NULL)
+    {
+        ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+        if (ext_mutex == RT_NULL)
+        {
+            LOG_E("create lwext mutex failed.\n");
+            return -1;
+        }
+    }
+    if (ext4_mutex == RT_NULL)
+    {
+        ext4_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+        if (ext4_mutex == RT_NULL)
+        {
+            LOG_E("create lwext mutex failed.\n");
+            return -1;
+        }
+    }
 #endif
     if (devid == RT_NULL)
     {
@@ -452,8 +452,8 @@ static int dfs_ext_open(struct dfs_fd* file)
             file->data = f;
 #ifdef RT_USING_SMART
             file->fnode->flags = f->flags;
-			file->pos = f->fpos;
-			file->fnode->size = (size_t)f->fsize;   		
+            file->pos = f->fpos;
+            file->fnode->size = (size_t)f->fsize;
 #endif
         }
         else
@@ -700,7 +700,7 @@ static int blockdev_close(struct ext4_blockdev *bdev)
 static int blockdev_lock(struct ext4_blockdev *bdev)
 {
 #ifdef RT_USING_SMART
-	rt_err_t result = -RT_EBUSY;
+    rt_err_t result = -RT_EBUSY;
 
     while (result == -RT_EBUSY)
     {
@@ -718,7 +718,7 @@ static int blockdev_lock(struct ext4_blockdev *bdev)
 static int blockdev_unlock(struct ext4_blockdev *bdev)
 {
 #ifdef RT_USING_SMART
-	rt_mutex_release(ext_mutex);
+    rt_mutex_release(ext_mutex);
 #endif
     return 0;
 }
