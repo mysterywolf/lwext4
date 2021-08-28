@@ -18,7 +18,6 @@
  */
 
 #include <rtthread.h>
-#include <rtdef.h>
 #include <dfs.h>
 #include <dfs_fs.h>
 #include <dfs_file.h>
