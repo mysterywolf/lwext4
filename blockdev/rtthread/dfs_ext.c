@@ -13,6 +13,7 @@
 
 #include <rtthread.h>
 #include <rtdef.h>
+#include <string.h>
 #include <dfs.h>
 #include <dfs_fs.h>
 #include <dfs_file.h>
@@ -83,7 +84,7 @@ static struct ext4_blockdev * const ext4_blkdev_list[RT_DFS_EXT_DRIVES] =
     &ext4_blkdev3,
 #endif
 };
-
+#ifdef RT_USING_SMART
 static rt_mutex_t ext_mutex = RT_NULL;
 static rt_mutex_t ext4_mutex = RT_NULL;
 static void ext_lock(void);
@@ -116,7 +117,7 @@ static void ext_unlock(void)
     rt_mutex_release(ext4_mutex);
     return ;
 }
-
+#endif
 static int get_disk(rt_device_t id)
 {
     int index;
@@ -151,26 +152,32 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     int index;
     long partid = (long)data;
     char* img = fs->dev_id->parent.name;
-
-    ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+#ifdef RT_USING_SMART
     if (ext_mutex == RT_NULL)
     {
-        LOG_E("create lwext mutex failed.\n");
-        return -1;
+        ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+        if (ext_mutex == RT_NULL)
+        {
+            LOG_E("create lwext mutex failed.\n");
+            return -1;
+        }
     }
-    ext4_mutex = rt_mutex_create("lwext4",RT_IPC_FLAG_FIFO);
     if (ext4_mutex == RT_NULL)
     {
-        LOG_E("create lwext4 mutex failed.\n");
-        return -1;
+        ext4_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+        if (ext4_mutex == RT_NULL)
+        {
+            LOG_E("create lwext mutex failed.\n");
+            return -1;
+        }
     }
-
+#endif
     /* get an empty position */
     index = get_disk(RT_NULL);
     if (index == -1)
     {
         LOG_E("dfs_ext_mount: get an empty position.\n");
-        return -RT_EINVAL;
+        return -RT_EINVAL;       
     }
 
     lwext4_init(fs->dev_id);
@@ -198,9 +205,9 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
             ext4_device_unregister(img);
             LOG_E("ext4 mount fail!(%d)\n",rc);
         }
-
+#ifdef RT_USING_SMART
         ext4_mount_setup_locks(fs->path, &ext4_lock_ops);
-
+#endif
     }
     else
     {
@@ -225,7 +232,7 @@ static int dfs_ext_unmount(struct dfs_filesystem* fs)
     return rc;
 }
 
-static int dfs_ext_mkfs(rt_device_t devid)
+static int dfs_ext_mkfs(rt_device_t devid, const char *fs_name)
 {
     int  index;
     int rc;
@@ -235,7 +242,26 @@ static int dfs_ext_mkfs(rt_device_t devid)
         .journal = true,
     };
     char* img = devid->parent.name;
-
+#ifdef RT_USING_SMART
+    if (ext_mutex == RT_NULL)
+    {
+        ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+        if (ext_mutex == RT_NULL)
+        {
+            LOG_E("create lwext mutex failed.\n");
+            return -1;
+        }
+    }
+    if (ext4_mutex == RT_NULL)
+    {
+        ext4_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
+        if (ext4_mutex == RT_NULL)
+        {
+            LOG_E("create lwext mutex failed.\n");
+            return -1;
+        }
+    }
+#endif
     if (devid == RT_NULL)
     {
         return -RT_EINVAL;
@@ -290,6 +316,13 @@ static int dfs_ext_statfs(struct dfs_filesystem *fs, struct statfs *buf)
 }
 static int dfs_ext_ioctl(struct dfs_fd* file, int cmd, void* args)
 {
+    switch (cmd)
+    {
+    case F_GETLK:
+            return 0;
+    case F_SETLK:
+            return 0;
+    }
     return -RT_EIO;
 }
 
@@ -324,7 +357,11 @@ static int dfs_ext_write(struct dfs_fd *fd, const void *buf, size_t count)
 static int dfs_ext_flush(struct dfs_fd *fd)
 {
     int error = RT_EOK;
+#ifdef RT_USING_SMART
     error = ext4_cache_flush(fd->fnode->path);
+#else
+    error = ext4_cache_flush(fd->path);
+#endif
     if(error != RT_EOK)
     {
         return -error;
@@ -333,11 +370,11 @@ static int dfs_ext_flush(struct dfs_fd *fd)
     return error;
 }
 
-static int dfs_ext_lseek(struct dfs_fd* file, rt_off_t offset)
+static int dfs_ext_lseek(struct dfs_fd* file, off_t offset)
 {
     int r;
 
-    r = ext4_fseek(file->data, offset, SEEK_SET);
+    r = ext4_fseek(file->data, (int64_t)offset, SEEK_SET);
 
     return -r;
 }
@@ -413,6 +450,11 @@ static int dfs_ext_open(struct dfs_fd* file)
         if(EOK == r)
         {
             file->data = f;
+#ifdef RT_USING_SMART
+            file->fnode->flags = f->flags;
+            file->pos = f->fpos;
+            file->fnode->size = (size_t)f->fsize;
+#endif
         }
         else
         {
@@ -481,7 +523,7 @@ static int dfs_ext_getdents(struct dfs_fd* file, struct dirent* dirp, rt_uint32_
         rentry = ext4_dir_entry_next(file->data);
         if(NULL != rentry)
         {
-            strncpy(d->d_name, rentry->name, DFS_PATH_MAX);
+            strncpy(d->d_name, (char *)rentry->name, DFS_PATH_MAX);
             if(EXT4_DE_DIR == rentry->inode_type)
             {
                 d->d_type = DT_DIR;
@@ -559,7 +601,7 @@ INIT_COMPONENT_EXPORT(dfs_ext_init);
 static int blockdev_open(struct ext4_blockdev *bdev)
 {
     int r;
-    int index = get_bdev(bdev);
+    uint8_t index = get_bdev(bdev);
     rt_device_t device = disk[index];
     struct rt_device_blk_geometry geometry;
 
@@ -580,8 +622,8 @@ static int blockdev_open(struct ext4_blockdev *bdev)
         if(bdev->part_offset == -1)
         {
             bdev->part_offset = 0;
-            bdev->part_size = geometry.sector_count*geometry.bytes_per_sector;
         }
+        bdev->part_size = geometry.sector_count*geometry.bytes_per_sector;
         bdev->bdif->ph_bsize = geometry.block_size;
         disk_sector_size[index] = geometry.bytes_per_sector;
         bdev->bdif->ph_bcnt = bdev->part_size / bdev->bdif->ph_bsize;
@@ -595,7 +637,7 @@ static int blockdev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id
              uint32_t blk_cnt)
 {
     int result;
-    int index = get_bdev(bdev);
+    uint8_t index = get_bdev(bdev);
     rt_device_t device = disk[index];
     RT_ASSERT(index < RT_DFS_EXT_DRIVES);
     RT_ASSERT(device);
@@ -620,7 +662,7 @@ static int blockdev_bwrite(struct ext4_blockdev *bdev, const void *buf,
               uint64_t blk_id, uint32_t blk_cnt)
 {
     int result;
-    int index = get_bdev(bdev);
+    uint8_t index = get_bdev(bdev);
     rt_device_t device = disk[index];
 
     RT_ASSERT(index < RT_DFS_EXT_DRIVES);
@@ -644,7 +686,7 @@ static int blockdev_bwrite(struct ext4_blockdev *bdev, const void *buf,
 static int blockdev_close(struct ext4_blockdev *bdev)
 {
     int result;
-    int index = get_bdev(bdev);
+    uint8_t index = get_bdev(bdev);
     rt_device_t device = disk[index];
 
     RT_ASSERT(index < RT_DFS_EXT_DRIVES);
@@ -657,6 +699,7 @@ static int blockdev_close(struct ext4_blockdev *bdev)
 
 static int blockdev_lock(struct ext4_blockdev *bdev)
 {
+#ifdef RT_USING_SMART
     rt_err_t result = -RT_EBUSY;
 
     while (result == -RT_EBUSY)
@@ -668,11 +711,14 @@ static int blockdev_lock(struct ext4_blockdev *bdev)
     {
         RT_ASSERT(0);
     }
+#endif
     return 0;
 }
 
 static int blockdev_unlock(struct ext4_blockdev *bdev)
 {
+#ifdef RT_USING_SMART
     rt_mutex_release(ext_mutex);
+#endif
     return 0;
 }
