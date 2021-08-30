@@ -177,7 +177,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     if (index == -1)
     {
         LOG_E("dfs_ext_mount: get an empty position.\n");
-        return -ENOENT;
+        return -RT_EINVAL;       
     }
 
     lwext4_init(fs->dev_id);
