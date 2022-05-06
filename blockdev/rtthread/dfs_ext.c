@@ -181,14 +181,31 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     }
 
     lwext4_init(fs->dev_id);
-    if(partid >= 0 && partid <= 3)
+
+    if (get_check_type() == 1)
     {
-        get_partition(partid, ext4_blkdev_list[index]);
+        if(partid >= 0 && partid <= 127)
+        {
+            get_partition(partid, ext4_blkdev_list[index]);
+        }
+        else
+        {
+            LOG_E("dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
+            ext4_blkdev_list[index]->part_offset = -1;
+        }
+
     }
     else
     {
-        LOG_E("dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
-        ext4_blkdev_list[index]->part_offset = -1;
+        if(partid >= 0 && partid <= 3)
+        {
+            get_partition(partid, ext4_blkdev_list[index]);
+        }
+        else
+        {
+            LOG_E("dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
+            ext4_blkdev_list[index]->part_offset = -1;
+        }
     }
 
     rc = ext4_device_register(ext4_blkdev_list[index], img);
@@ -228,7 +245,7 @@ static int dfs_ext_unmount(struct dfs_filesystem* fs)
         return -RT_EINVAL;
 
     rc = ext4_umount(mp);
-
+    gpt_data_init();
     return rc;
 }
 

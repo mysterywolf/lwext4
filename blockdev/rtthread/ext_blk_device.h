@@ -5,6 +5,7 @@
 
 int get_partition(int part_id, struct ext4_blockdev *part);
 void lwext4_init(rt_device_t mbr_device);
-
+void gpt_data_init(void);
+int get_check_type(void);
 #endif
 

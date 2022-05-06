@@ -358,7 +358,7 @@ static int ext4_fs_init_block_bitmap(struct ext4_block_group_ref *bg_ref)
         ext4_bmap_bit_set(block_bitmap.data,
                   (uint32_t)(bmp_inode - first_bg));
 
-        for (i = inode_table; i < inode_table + inode_table_bcnt; i++) {
+    for (i = inode_table; i < inode_table + inode_table_bcnt; i++) {
         in_bg = ext4_block_in_group(sb, i, bg_ref->index);
         if (!flex_bg || in_bg)
             ext4_bmap_bit_set(block_bitmap.data,
@@ -369,7 +369,7 @@ static int ext4_fs_init_block_bitmap(struct ext4_block_group_ref *bg_ref)
          * less than the blocksize * 8 ( which is the size
          * of bitmap ), set rest of the block bitmap to 1
          */
-        ext4_fs_mark_bitmap_end(group_blocks, block_size * 8, block_bitmap.data);
+    ext4_fs_mark_bitmap_end(group_blocks, block_size * 8, block_bitmap.data);
     ext4_trans_set_block_dirty(block_bitmap.buf);
 
     ext4_balloc_set_bitmap_csum(sb, bg_ref->block_group, block_bitmap.data);
