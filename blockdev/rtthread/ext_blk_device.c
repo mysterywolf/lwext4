@@ -24,6 +24,7 @@
 #include <ext4.h>
 #include <ext4_debug.h>
 #include "ext_blk_device.h"
+#include "ext_gpt.h"
 #include <stdint.h>
 #include "ext4_mbr.h"
 #define DBG_TAG               "ext_blk_device"
@@ -35,8 +36,14 @@ static struct lwext4_part
 {
     struct ext4_blockdev partitions[4];
 } _part;
+
+static struct lwext4_gpt_part
+{
+    struct ext4_blockdev partitions[128];
+} __part;
 rt_device_t _mbr_device;
 static rt_uint32_t _sector_size;
+static rt_uint32_t check_gpt_and_mbr = 0;
 
 static int blockdev_open(struct ext4_blockdev *bdev)
 {
@@ -46,7 +53,7 @@ static int blockdev_open(struct ext4_blockdev *bdev)
     RT_ASSERT(device);
 
     r = rt_device_open((rt_device_t)device, RT_DEVICE_OFLAG_RDWR);
-    if (r != RT_EOK)
+    if (r != RT_EOK && r != -RT_EBUSY)
     {
         return r;
     }
@@ -57,7 +64,7 @@ static int blockdev_open(struct ext4_blockdev *bdev)
         bdev->part_offset = 0;
         bdev->part_size = geometry.sector_count * geometry.bytes_per_sector;
         _sector_size = geometry.bytes_per_sector;
-        bdev->bdif->ph_bcnt = bdev->part_size / bdev->bdif->ph_bsize;
+        bdev->bdif->ph_bcnt =  geometry.sector_count;   
     }
 
     return r;
@@ -129,18 +136,46 @@ EXT4_BLOCKDEV_STATIC_INSTANCE(bdev, 512, 0, blockdev_open,
 
 int get_partition(int part_id, struct ext4_blockdev *part)
 {
-    part->part_offset = _part.partitions[part_id].part_offset;
-    part->part_size = _part.partitions[part_id].part_size;
+    if (check_gpt_and_mbr == 0)
+    {
+        part->part_offset = _part.partitions[part_id].part_offset;
+        part->part_size = _part.partitions[part_id].part_size;
+    }
+    else if (check_gpt_and_mbr == 1)
+    {
+        part->part_offset = __part.partitions[part_id].part_offset;
+        part->part_size = __part.partitions[part_id].part_size;
+    }
 
     return 0;
 }
+
+void gpt_data_init(void)
+{
+    check_gpt_and_mbr = 0;
+    return;
+}
+
+int get_check_type(void)
+{
+    return check_gpt_and_mbr;
+}
+
 void lwext4_init(rt_device_t mbr_device)
 {
     _mbr_device = mbr_device;
 
-    if (ext4_mbr_scan(&bdev, (struct ext4_mbr_bdevs *)&_part) != EOK)
+    if (ext4_gpt_scan(&bdev, (struct ext4_gpt_bdevs *)&__part) != EOK)
     {
-        LOG_E("MBR scan failed!\n");
-        return;
+        check_gpt_and_mbr = 0;
+        LOG_E("GPT scan failed!\n");
+        if (ext4_mbr_scan(&bdev, (struct ext4_mbr_bdevs *)&_part) != EOK)
+        {
+            LOG_E("MBR scan failed!\n");
+            return;
+        }
     }
+
+    check_gpt_and_mbr = 1;
+    return;
 }

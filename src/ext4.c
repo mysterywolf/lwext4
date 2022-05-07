@@ -1565,7 +1565,7 @@ int ext4_fopen2(ext4_file *file, const char *path, int flags)
     if (!mp)
         return ENOENT;
 
-        filetype = EXT4_DE_REG_FILE;
+    filetype = EXT4_DE_REG_FILE;
 
     EXT4_MP_LOCK(mp);
     ext4_block_cache_write_back(mp->fs.bdev, 1);
