@@ -27,10 +27,6 @@
 #include "ext_gpt.h"
 #include <stdint.h>
 #include "ext4_mbr.h"
-#define DBG_TAG               "ext_blk_device"
-#define DBG_LVL               DBG_INFO
-
-#include <rtdbg.h>
 
 static struct lwext4_part
 {
@@ -168,14 +164,16 @@ void lwext4_init(rt_device_t mbr_device)
     if (ext4_gpt_scan(&bdev, (struct ext4_gpt_bdevs *)&__part) != EOK)
     {
         check_gpt_and_mbr = 0;
-        LOG_E("GPT scan failed!\n");
+        ext4_dbg(DEBUG_BLK_DEVICE, "GPT scan failed!\n");
         if (ext4_mbr_scan(&bdev, (struct ext4_mbr_bdevs *)&_part) != EOK)
         {
-            LOG_E("MBR scan failed!\n");
+            ext4_dbg(DEBUG_BLK_DEVICE, "MBR scan failed!\n");
             return;
         }
     }
-
-    check_gpt_and_mbr = 1;
+    else
+    {
+        check_gpt_and_mbr = 1;
+    }
     return;
 }

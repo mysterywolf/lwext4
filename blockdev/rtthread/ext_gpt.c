@@ -21,11 +21,6 @@
 #include <inttypes.h>
 #include <string.h>
 
-#define DBG_TAG               "ext_gpt"
-#define DBG_LVL               DBG_INFO
-
-#include <rtdbg.h>
-
 #define min(a, b) a < b ? a : b
 static int force_gpt = 0;
 
@@ -34,7 +29,7 @@ static inline int efi_guidcmp (gpt_guid_t left, gpt_guid_t right)
     return memcmp(&left, &right, sizeof (gpt_guid_t));
 }
 
-static uint32_t last_lba(struct ext4_blockdev *bdev)
+static uint64_t last_lba(struct ext4_blockdev *bdev)
 {
     RT_ASSERT(bdev != RT_NULL);
     return (bdev->bdif->ph_bcnt) - 1;
@@ -123,8 +118,8 @@ check_hybrid:
         sz = (uint32_t)(mbr->partition_record[part].size_in_lba);
         if (sz != (uint32_t) total_sectors - 1 && sz != 0xFFFFFFFF)
         {
-            LOG_I("GPT: mbr size in lba (%u) different than whole disk (%u).\n",
-                 sz, min(total_sectors - 1, 0xFFFFFFFF));
+            ext4_dbg(DEBUG_EXT_GPT, "GPT: mbr size in lba (0x%"PRIx32") different than whole disk", sz);
+            ext4_dbg(DEBUG_EXT_GPT, " (0x%"PRIu64").\n", min(total_sectors - 1, 0xFFFFFFFF));                 
         }
     }
 
@@ -164,7 +159,7 @@ static gpt_entry *alloc_read_gpt_entries(struct ext4_blockdev *bdev, gpt_header 
 
 }
 
-static gpt_header *alloc_read_gpt_header(struct ext4_blockdev *bdev, size_t lba)
+static gpt_header *alloc_read_gpt_header(struct ext4_blockdev *bdev, uint64_t lba)
 {
     gpt_header *gpt;
 
@@ -183,9 +178,9 @@ static gpt_header *alloc_read_gpt_header(struct ext4_blockdev *bdev, size_t lba)
     return gpt;
 }
 
-static int is_gpt_valid(struct ext4_blockdev *bdev, size_t lba, gpt_header **gpt, gpt_entry **ptes)
+static int is_gpt_valid(struct ext4_blockdev *bdev, uint64_t lba, gpt_header **gpt, gpt_entry **ptes)
 {
-    size_t lastlba;
+    uint64_t lastlba;
 
     if (!ptes)
     {
@@ -200,16 +195,9 @@ static int is_gpt_valid(struct ext4_blockdev *bdev, size_t lba, gpt_header **gpt
     /* Check the GUID Partition Table signature */
     if ((uint64_t)((*gpt)->signature) != GPT_HEADER_SIGNATURE)
     {
-        printf("GUID Partition Table Header signature is wrong:"
-             "%lx != %lx\n",(uint64_t)((*gpt)->signature),(uint64_t)GPT_HEADER_SIGNATURE);
-        goto fail;
-    }
-
-    /* Check the GUID Partition Table header size is too small */
-    if ((uint32_t)((*gpt)->header_size) < sizeof(gpt_header))
-    {
-        printf("GUID Partition Table Header size is too small: %u < %zu\n",
-            (uint32_t)((*gpt)->header_size),sizeof(gpt_header));
+        ext4_dbg(DEBUG_EXT_GPT, "GUID Partition Table Header signature is wrong: 0x%"PRIu64" !=", 
+            (uint64_t)((*gpt)->signature));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", (uint64_t)GPT_HEADER_SIGNATURE);
         goto fail;
     }
 
@@ -217,9 +205,9 @@ static int is_gpt_valid(struct ext4_blockdev *bdev, size_t lba, gpt_header **gpt
      * the GUID Partition Table */
     if ((uint64_t)((*gpt)->my_lba) != lba)
     {
-        printf("GPT my_lba incorrect: %ld != %ld\n",
-             (uint64_t)((*gpt)->my_lba),
-             (uint64_t)lba);
+        ext4_dbg(DEBUG_EXT_GPT, "GPT my_lba incorrect: 0x%"PRIu64" !=",
+             (uint64_t)((*gpt)->my_lba));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", (uint64_t)lba);
         goto fail;
     }
 
@@ -229,32 +217,32 @@ static int is_gpt_valid(struct ext4_blockdev *bdev, size_t lba, gpt_header **gpt
     lastlba = last_lba(bdev);
     if ((uint64_t)((*gpt)->first_usable_lba) > lastlba)
     {
-        printf("GPT: first_usable_lba incorrect: %ld > %ld\n",
-             ((uint64_t)((*gpt)->first_usable_lba)),
-             (size_t)lastlba);
+        ext4_dbg(DEBUG_EXT_GPT, "GPT: first_usable_lba incorrect: 0x%"PRIu64" >",
+             ((uint64_t)((*gpt)->first_usable_lba)));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", lastlba);
         goto fail;
     }
 
     if ((uint64_t)((*gpt)->last_usable_lba) > lastlba)
     {
-        printf("GPT: last_usable_lba incorrect: %ld > %ld\n",
-             (uint64_t)((*gpt)->last_usable_lba),
-             (size_t)lastlba);
+        ext4_dbg(DEBUG_EXT_GPT, "GPT: last_usable_lba incorrect: 0x%"PRIu64" >",
+             (uint64_t)((*gpt)->last_usable_lba));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", lastlba);
         goto fail;
     }
 
     if ((uint64_t)((*gpt)->last_usable_lba) < (uint64_t)((*gpt)->first_usable_lba))
     {
-        printf("GPT: last_usable_lba incorrect: %ld > %ld\n",
-             (uint64_t)((*gpt)->last_usable_lba),
-             (uint64_t)((*gpt)->first_usable_lba));
+        ext4_dbg(DEBUG_EXT_GPT, "GPT: last_usable_lba incorrect: 0x%"PRIu64" >",
+             (uint64_t)((*gpt)->last_usable_lba));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", (uint64_t)((*gpt)->first_usable_lba));
         goto fail;
     }
 
     /* Check that sizeof_partition_entry has the correct value */
     if ((uint32_t)((*gpt)->sizeof_partition_entry) != sizeof(gpt_entry))
     {
-        printf("GUID Partition Entry Size check failed.\n");
+        ext4_dbg(DEBUG_EXT_GPT, "GUID Partition Entry Size check failed.\n");
         goto fail;
     }
 
@@ -300,7 +288,7 @@ static inline int is_pte_valid(const gpt_entry *pte, const size_t lastlba)
  * and prints warnings on discrepancies.
  *
  */
-static void compare_gpts(gpt_header *pgpt, gpt_header *agpt, size_t lastlba)
+static void compare_gpts(gpt_header *pgpt, gpt_header *agpt, uint64_t lastlba)
 {
     int error_found = 0;
     if (!pgpt || !agpt)
@@ -308,91 +296,82 @@ static void compare_gpts(gpt_header *pgpt, gpt_header *agpt, size_t lastlba)
 
     if ((uint64_t)(pgpt->my_lba) != (uint64_t)(agpt->alternate_lba))
     {
-        printf("GPT:Primary header LBA != Alt. header alternate_lba\n");
-        printf("GPT:%ld != %ld\n",
-               (uint64_t)(pgpt->my_lba),
-                       (uint64_t)(agpt->alternate_lba));
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:Primary header LBA != Alt. header alternate_lba\n");
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:0x%"PRIu64" !=", (uint64_t)(pgpt->my_lba));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", (uint64_t)(agpt->alternate_lba));
         error_found++;
     }
 
     if ((uint64_t)(pgpt->alternate_lba) != (uint64_t)(agpt->my_lba))
     {
-        printf("GPT:Primary header alternate_lba != Alt. header my_lba\n");
-        printf("GPT:%ld != %ld\n",
-               (uint64_t)(pgpt->alternate_lba),
-                       (uint64_t)(agpt->my_lba));
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:Primary header alternate_lba != Alt. header my_lba\n");
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:0x%"PRIu64" !=", (uint64_t)(pgpt->alternate_lba));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", (uint64_t)(agpt->my_lba));
         error_found++;
     }
 
     if ((uint64_t)(pgpt->first_usable_lba) != (uint64_t)(agpt->first_usable_lba))
     {
-        printf("GPT:first_usable_lbas don't match.\n");
-        printf("GPT:%ld != %ld\n",
-               (uint64_t)(pgpt->first_usable_lba),
-                       (uint64_t)(agpt->first_usable_lba));
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:first_usable_lbas don't match.\n");
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:0x%"PRIu64" !=", (uint64_t)(pgpt->first_usable_lba));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", (uint64_t)(agpt->first_usable_lba));
         error_found++;
     }
 
     if ((uint64_t)(pgpt->last_usable_lba) != (uint64_t)(agpt->last_usable_lba))
     {
-        printf("GPT:last_usable_lbas don't match.\n");
-        printf("GPT:%ld != %ld\n",
-               (uint64_t)(pgpt->last_usable_lba),
-                       (uint64_t)(agpt->last_usable_lba));
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:last_usable_lbas don't match.\n");
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:0x%"PRIu64" !=", (uint64_t)(pgpt->last_usable_lba));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", (uint64_t)(agpt->last_usable_lba));
         error_found++;
     }
 
     if (efi_guidcmp(pgpt->disk_guid, agpt->disk_guid))
     {
-        printf("GPT:disk_guids don't match.\n");
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:disk_guids don't match.\n");
         error_found++;
     }
 
     if ((pgpt->num_partition_entries) != (agpt->num_partition_entries))
     {
-        printf("GPT:num_partition_entries don't match: "
-               "0x%x != 0x%x\n",
-               (pgpt->num_partition_entries),
-               (agpt->num_partition_entries));
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:num_partition_entries don't match: "
+               "0x%"PRIx32" !=", (pgpt->num_partition_entries));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIx32"\n", (agpt->num_partition_entries));
         error_found++;
     }
     if ((pgpt->sizeof_partition_entry) != (agpt->sizeof_partition_entry))
     {
-        printf("GPT:sizeof_partition_entry values don't match: "
-               "0x%x != 0x%x\n",
-                       (pgpt->sizeof_partition_entry),
-               (agpt->sizeof_partition_entry));
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:sizeof_partition_entry values don't match: "
+               "0x%"PRIx32" !=", (pgpt->sizeof_partition_entry));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIx32"\n", (agpt->sizeof_partition_entry));
         error_found++;
     }
     if ((pgpt->partition_entry_array_crc32) != (agpt->partition_entry_array_crc32))
     {
-        printf("GPT:partition_entry_array_crc32 values don't match: "
-               "0x%x != 0x%x\n",
-                       (pgpt->partition_entry_array_crc32),
-               (agpt->partition_entry_array_crc32));
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:partition_entry_array_crc32 values don't match: "
+               "0x%"PRIx32" !=", (pgpt->partition_entry_array_crc32));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIx32"\n", (agpt->partition_entry_array_crc32));
         error_found++;
     }
     if ((pgpt->alternate_lba) != lastlba)
     {
-        printf("GPT:Primary header thinks Alt. header is not at the end of the disk.\n");
-        printf("GPT:%ld != %ld\n",
-            (uint64_t)(pgpt->alternate_lba),
-            (size_t)lastlba);
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:Primary header thinks Alt. header is not at the end of the disk.\n");
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:0x%"PRIu64" !=", (uint64_t)(pgpt->alternate_lba));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", lastlba);
         error_found++;
     }
 
     if ((agpt->my_lba) != lastlba)
     {
-        printf("GPT:Alternate GPT header not at the end of the disk.\n");
-        printf("GPT:%ld != %ld\n",
-            (uint64_t)(agpt->my_lba),
-            (size_t)lastlba);
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:Alternate GPT header not at the end of the disk.\n");
+        ext4_dbg(DEBUG_EXT_GPT, "GPT:0x%"PRIu64" !=", (uint64_t)(agpt->my_lba));
+        ext4_dbg(DEBUG_EXT_GPT, " 0x%"PRIu64"\n", lastlba);
         error_found++;
     }
 
     if (error_found)
     {
-        printf("GPT: Use GNU Parted to correct GPT errors.\n");
+        ext4_dbg(DEBUG_EXT_GPT, "GPT: Use GNU Parted to correct GPT errors.\n");
     }
 
     return;
@@ -422,7 +401,7 @@ static int find_valid_gpt(struct ext4_blockdev *bdev, gpt_header **gpt,
     gpt_entry *pptes = RT_NULL, *aptes = RT_NULL;
     legacy_mbr *legacymbr;
     size_t total_sectors = 0;
-    size_t lastlba = 0;
+    uint64_t lastlba = 0;
     int status = 0;
 
     if (!ptes)
@@ -445,7 +424,7 @@ static int find_valid_gpt(struct ext4_blockdev *bdev, gpt_header **gpt,
         status = ext4_block_readbytes(bdev, 0, (uint8_t *)legacymbr, 512);
         if (status != RT_EOK)
         {
-            LOG_I("status:%d\n", status);
+            ext4_dbg(DEBUG_EXT_GPT, "status:%d\n", status);
             goto fail;
         }
 
@@ -457,7 +436,7 @@ static int find_valid_gpt(struct ext4_blockdev *bdev, gpt_header **gpt,
             goto fail;
         }
 
-        LOG_I("Device has a %s MBR\n",
+        ext4_dbg(DEBUG_EXT_GPT, "Device has a %s MBR\n",
              good_pmbr == GPT_MBR_PROTECTIVE ?
                         "protective" : "hybrid");
     }
@@ -490,7 +469,7 @@ static int find_valid_gpt(struct ext4_blockdev *bdev, gpt_header **gpt,
             rt_free(aptes);
             if (!good_agpt)
             {
-                LOG_D("Alternate GPT is invalid, using primary GPT.\n");
+                ext4_dbg(DEBUG_EXT_GPT, "Alternate GPT is invalid, using primary GPT.\n");
             }
             return 1;
         }
@@ -500,7 +479,7 @@ static int find_valid_gpt(struct ext4_blockdev *bdev, gpt_header **gpt,
             *ptes = aptes;
             rt_free(pgpt);
             rt_free(pptes);
-            LOG_D("Primary GPT is invalid, using alternate GPT.\n");
+            ext4_dbg(DEBUG_EXT_GPT, "Primary GPT is invalid, using alternate GPT.\n");
                 return 1;
         }
     }
@@ -539,18 +518,19 @@ int ext_get_partition_param(struct ext4_blockdev *bdev, struct ext4_gpt_bdevs *b
         (off_t)(_ptes[pindex].starting_lba) * 512;
     bdevs->partitions[pindex].part_size = (_ptes[pindex].ending_lba) - (_ptes[pindex].starting_lba) + 1ULL;;
 
-    rt_kprintf("found part[%d], begin(sector): %d, end(sector):%d size: ",
-             pindex, _ptes[pindex].starting_lba, _ptes[pindex].ending_lba);
+    ext4_dbg(DEBUG_EXT_GPT, "found part[%x],", pindex);
+    ext4_dbg(DEBUG_EXT_GPT, " begin(sector): 0x%"PRIu64",", _ptes[pindex].starting_lba);
+    ext4_dbg(DEBUG_EXT_GPT, " end(sector):0x%"PRIu64" size: ", _ptes[pindex].ending_lba);             
     if ((bdevs->partitions[pindex].part_size >> 11) == 0)
-        rt_kprintf("%d%s", bdevs->partitions[pindex].part_size >> 1, "KB\n"); /* KB */
+        ext4_dbg(DEBUG_EXT_GPT, "0x%"PRIu64"%s", bdevs->partitions[pindex].part_size >> 1, "KB\n"); /* KB */
     else
     {
         unsigned int part_size;
         part_size = bdevs->partitions[pindex].part_size >> 11;                /* MB */
         if ((part_size >> 10) == 0)
-            rt_kprintf("%d.%d%s", part_size, (bdevs->partitions[pindex].part_size >> 1) & 0x3FF, "MB\n");
+            ext4_dbg(DEBUG_EXT_GPT, "%x.%"PRIu64"%s", part_size, (bdevs->partitions[pindex].part_size >> 1) & 0x3FF, "MB\n");
         else
-            rt_kprintf("%d.%d%s", part_size >> 10, bdevs->partitions[pindex].part_size & 0x3FF, "GB\n");
+            ext4_dbg(DEBUG_EXT_GPT, "%x.%"PRIu64"%s", part_size >> 10, bdevs->partitions[pindex].part_size & 0x3FF, "GB\n");
     }
     return 0;
 }

@@ -12,7 +12,6 @@
  */
 
 #include <rtthread.h>
-#include <rtdef.h>
 #include <string.h>
 #include <dfs.h>
 #include <dfs_fs.h>
@@ -29,12 +28,7 @@
 #include "ext4_errno.h"
 #include "ext4_mbr.h"
 #include "ext4_super.h"
-
-#define DBG_TAG               "dfs_ext"
-#define DBG_LVL               DBG_INFO
-
-#include <rtdbg.h>
-
+#include "ext4_debug.h"
 
 static int blockdev_open(struct ext4_blockdev *bdev);
 static int blockdev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id,
@@ -150,7 +144,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
 {
     int rc;
     int index;
-    long partid = (long)data;
+    uint32_t partid = (intptr_t)(const void *)data;
     char* img = fs->dev_id->parent.name;
 #ifdef RT_USING_SMART
     if (ext_mutex == RT_NULL)
@@ -158,7 +152,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
         ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
         if (ext_mutex == RT_NULL)
         {
-            LOG_E("create lwext mutex failed.\n");
+            ext4_dbg(DEBUG_DFS_EXT, "create lwext mutex failed.\n");
             return -1;
         }
     }
@@ -167,7 +161,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
         ext4_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
         if (ext4_mutex == RT_NULL)
         {
-            LOG_E("create lwext mutex failed.\n");
+            ext4_dbg(DEBUG_DFS_EXT, "create lwext mutex failed.\n");
             return -1;
         }
     }
@@ -176,7 +170,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     index = get_disk(RT_NULL);
     if (index == -1)
     {
-        LOG_E("dfs_ext_mount: get an empty position.\n");
+        ext4_dbg(DEBUG_DFS_EXT, "dfs_ext_mount: get an empty position.\n");
         return -RT_EINVAL;       
     }
 
@@ -190,7 +184,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
         }
         else
         {
-            LOG_E("dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
+            ext4_dbg(DEBUG_DFS_EXT, "dfs_ext_mount: mount partid:%d ,the partid max is 127.\n", partid);
             ext4_blkdev_list[index]->part_offset = -1;
         }
 
@@ -203,7 +197,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
         }
         else
         {
-            LOG_E("dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
+            ext4_dbg(DEBUG_DFS_EXT, "dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
             ext4_blkdev_list[index]->part_offset = -1;
         }
     }
@@ -220,7 +214,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
             disk[index] = NULL;
             rc = -rc;
             ext4_device_unregister(img);
-            LOG_E("ext4 mount fail!(%d)\n",rc);
+            ext4_dbg(DEBUG_DFS_EXT, "ext4 mount fail!(%d)\n",rc);
         }
 #ifdef RT_USING_SMART
         ext4_mount_setup_locks(fs->path, &ext4_lock_ops);
@@ -228,7 +222,7 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
     }
     else
     {
-        LOG_E("device register fail(%d)!\n",rc);
+        ext4_dbg(DEBUG_DFS_EXT, "device register fail(%d)!\n",rc);
     }
 
     return rc;
@@ -265,7 +259,7 @@ static int dfs_ext_mkfs(rt_device_t devid, const char *fs_name)
         ext_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
         if (ext_mutex == RT_NULL)
         {
-            LOG_E("create lwext mutex failed.\n");
+            ext4_dbg(DEBUG_DFS_EXT, "create lwext mutex failed.\n");
             return -1;
         }
     }
@@ -274,7 +268,7 @@ static int dfs_ext_mkfs(rt_device_t devid, const char *fs_name)
         ext4_mutex = rt_mutex_create("lwext",RT_IPC_FLAG_FIFO);
         if (ext4_mutex == RT_NULL)
         {
-            LOG_E("create lwext mutex failed.\n");
+            ext4_dbg(DEBUG_DFS_EXT, "create lwext mutex failed.\n");
             return -1;
         }
     }
