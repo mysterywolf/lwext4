@@ -479,7 +479,22 @@ static int dfs_ext_unlink(struct dfs_filesystem *fs, const char *pathname)
 {
     int r;
 
-    r = ext4_fremove(pathname);
+    union {
+        ext4_dir dir;
+        ext4_file f;
+    } var;
+
+    r = ext4_dir_open(&(var.dir), pathname);
+    if (0 == r)
+    {
+        (void) ext4_dir_close(&(var.dir));
+        ext4_dir_rm(pathname);
+        
+    }
+    else
+    {
+        r = ext4_fremove(pathname);
+    }
 
     return -r;
 }
