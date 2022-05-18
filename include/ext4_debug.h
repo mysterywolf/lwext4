@@ -78,6 +78,9 @@ extern "C" {
 #define DEBUG_EXT4 (1ul << 15)
 #define DEBUG_JBD (1ul << 16)
 #define DEBUG_MBR (1ul << 17)
+#define DEBUG_DFS_EXT (1ul << 18)
+#define DEBUG_BLK_DEVICE (1ul << 19)
+#define DEBUG_EXT_GPT (1ul << 20)
 
 #define DEBUG_NOPREFIX (1ul << 31)
 #define DEBUG_ALL (0xFFFFFFFF)
@@ -121,6 +124,12 @@ static inline const char *ext4_dmask_id2str(uint32_t m)
         return "ext4_mbr: ";
     case DEBUG_EXT4:
         return "ext4: ";
+    case DEBUG_DFS_EXT:
+        return "dfs_ext: ";
+    case DEBUG_BLK_DEVICE:
+        return "blk_device: ";
+    case DEBUG_EXT_GPT:
+        return "ext_gpt: ";
     }
     return "";
 }
