@@ -502,6 +502,7 @@ static int dfs_ext_unlink(struct dfs_filesystem *fs, const char *pathname)
 static int dfs_ext_stat(struct dfs_filesystem* fs, const char *path, struct stat *st)
 {
     int r;
+    uint32_t mode = 0;
 
     union {
         ext4_dir dir;
@@ -513,15 +514,17 @@ static int dfs_ext_stat(struct dfs_filesystem* fs, const char *path, struct stat
     if(0 == r)
     {
         (void) ext4_dir_close(&(var.dir));
-        st->st_mode = S_IFDIR;
-        st->st_size = 0;
+        ext4_mode_get(path, &mode);
+        st->st_mode = mode;
+        st->st_size = var.dir.f.fsize;
     }
     else
     {
         r = ext4_fopen(&(var.f), path, "rb");
         if( 0 == r)
-        {
-            st->st_mode = S_IFREG;
+        {   
+            ext4_mode_get(path, &mode);
+            st->st_mode = mode;
             st->st_size = ext4_fsize(&(var.f));
             (void)ext4_fclose(&(var.f));
         }
