@@ -7,6 +7,7 @@
  * Date           Author            Notes
  * 2022-05-07     linzhenxing       add gpt
  */
+
 #ifndef __EXT_GPT_H
 #define __EXT_GPT_H
 #include <stdint.h>

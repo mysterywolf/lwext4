@@ -288,6 +288,7 @@ static inline int is_pte_valid(const gpt_entry *pte, const size_t lastlba)
  * and prints warnings on discrepancies.
  *
  */
+
 static void compare_gpts(gpt_header *pgpt, gpt_header *agpt, uint64_t lastlba)
 {
     int error_found = 0;

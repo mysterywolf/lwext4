@@ -175,5 +175,6 @@ void lwext4_init(rt_device_t mbr_device)
     {
         check_gpt_and_mbr = 1;
     }
+
     return;
 }
