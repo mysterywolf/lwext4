@@ -375,9 +375,6 @@ int ext4_mount(const char *dev_name, const char *mount_point,
     if (mp_len > CONFIG_EXT4_MAX_MP_NAME)
         return EINVAL;
 
-    if (mount_point[mp_len - 1] != '/')
-        return ENOTSUP;
-
     for (size_t i = 0; i < CONFIG_EXT4_BLOCKDEVS_COUNT; ++i) {
         if (!strcmp(dev_name, s_bdevices[i].name)) {
             bd = s_bdevices[i].bd;
@@ -474,16 +471,27 @@ Finish:
 
 static struct ext4_mountpoint *ext4_get_mount(const char *path)
 {
+    struct ext4_mountpoint *mp = NULL;
+    uint32_t fspath, prefixlen;
+
+    prefixlen = 0;
     for (size_t i = 0; i < CONFIG_EXT4_MOUNTPOINTS_COUNT; ++i) {
 
         if (!s_mp[i].mounted)
             continue;
 
-        if (!strncmp(s_mp[i].name, path, strlen(s_mp[i].name)))
-            return &s_mp[i];
-    }
+        fspath = strlen(s_mp[i].name);
 
-    return NULL;
+        if ((fspath < prefixlen) || (strncmp(s_mp[i].name, path, fspath) != 0))
+            continue;
+
+        /* check next path separator */
+        if (fspath > 1 && (strlen(path) > fspath) && (path[fspath] != '/'))
+            continue;
+        mp = &s_mp[i];
+        prefixlen = fspath;
+    }
+    return mp;
 }
 
 __unused
@@ -953,6 +961,10 @@ static int ext4_generic_open2(ext4_file *f, const char *path, int flags,
 
     /*Skip mount point*/
     path += strlen(mp->name);
+    if (path[0] == '/')
+    {
+        path += 1;
+    }
 
     if (name_off)
         *name_off = strlen(mp->name);
@@ -1151,7 +1163,10 @@ static int ext4_create_hardlink(const char *path,
 
     /*Skip mount point*/
     path += strlen(mp->name);
-
+    if (path[0] == '/')
+    {
+        path += 1;
+    }
     /*Load root*/
     r = ext4_fs_get_inode_ref(fs, EXT4_INODE_ROOT_INDEX, &ref);
     if (r != EOK)
@@ -1509,6 +1524,10 @@ int ext4_fremove(const char *path)
 
     /*Set path*/
     path += name_off;
+    if (path[0] == '/')
+    {
+        path += 1;
+    }
 
     len = ext4_path_check(path, &is_goal);
 
@@ -2021,7 +2040,7 @@ int ext4_fseek(ext4_file *file, int64_t offset, uint32_t origin)
 {
     switch (origin) {
     case SEEK_SET:
-        if (offset < 0 || (uint64_t)offset > file->fsize)
+        if (offset < 0)
             return EINVAL;
 
         file->fpos = offset;
@@ -2921,6 +2940,11 @@ int ext4_dir_rm(const char *path)
     }
 
     path += name_off;
+    if(path[0] == '/')
+    {
+        path += 1;
+    }
+    printf("ext4_dir_rm path:%s\n", path);
     len = ext4_path_check(path, &is_goal);
     inode_current = f.inode;
 
@@ -3160,6 +3184,7 @@ Finish:
 int ext4_dir_open(ext4_dir *dir, const char *path)
 {
     struct ext4_mountpoint *mp = ext4_get_mount(path);
+
     int r;
 
     if (!mp)

@@ -17,8 +17,6 @@
 #include <dfs_fs.h>
 #include <dfs_file.h>
 
-#include <ext_blk_device.h>
-
 #include "dfs_ext.h"
 
 #include "ext4.h"
@@ -144,7 +142,6 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
 {
     int rc;
     int index;
-    uint32_t partid = (intptr_t)(const void *)data;
     char* img = fs->dev_id->parent.name;
 #ifdef RT_USING_SMART
     if (ext_mutex == RT_NULL)
@@ -173,40 +170,14 @@ static int dfs_ext_mount(struct dfs_filesystem* fs, unsigned long rwflag, const 
         ext4_dbg(DEBUG_DFS_EXT, "dfs_ext_mount: get an empty position.\n");
         return -RT_EINVAL;       
     }
-
-    lwext4_init(fs->dev_id);
-
-    if (get_check_type() == 1)
-    {
-        if(partid >= 0 && partid <= 127)
-        {
-            get_partition(partid, ext4_blkdev_list[index]);
-        }
-        else
-        {
-            ext4_dbg(DEBUG_DFS_EXT, "dfs_ext_mount: mount partid:%d ,the partid max is 127.\n", partid);
-            ext4_blkdev_list[index]->part_offset = -1;
-        }
-
-    }
-    else
-    {
-        if(partid >= 0 && partid <= 3)
-        {
-            get_partition(partid, ext4_blkdev_list[index]);
-        }
-        else
-        {
-            ext4_dbg(DEBUG_DFS_EXT, "dfs_ext_mount: mount partid:%d ,the partid max is 3.\n", partid);
-            ext4_blkdev_list[index]->part_offset = -1;
-        }
-    }
-
+    disk[index] = fs->dev_id;
+    
+    rc = ext4_block_init(ext4_blkdev_list[index]);
+    if (rc != EOK)
+        return -rc;
     rc = ext4_device_register(ext4_blkdev_list[index], img);
     if(RT_EOK == rc)
     {
-        disk[index] = fs->dev_id;
-
         rc = ext4_mount(img, fs->path, false);
 
         if(RT_EOK != rc)
@@ -239,7 +210,6 @@ static int dfs_ext_unmount(struct dfs_filesystem* fs)
         return -RT_EINVAL;
 
     rc = ext4_umount(mp);
-    gpt_data_init();
     return rc;
 }
 
@@ -287,15 +257,17 @@ static int dfs_ext_mkfs(rt_device_t devid, const char *fs_name)
     if (index == -1) /* not found */
         return -RT_EINVAL;
 
+    disk[index] = devid;
+    rc = ext4_block_init(ext4_blkdev_list[index]);
+    if (rc != EOK)
+        return -rc;
+
     rc = ext4_device_register(ext4_blkdev_list[index], img);
     if(EOK == rc)
     {
-        disk[index] = devid;
-
         /* try to open device */
         rt_device_open(devid, RT_DEVICE_OFLAG_RDWR);
         rc = ext4_mkfs(&fs, ext4_blkdev_list[index], &info, F_SET_EXT4);
-
         /* no matter what, unregister */
         disk[index] = NULL;
         ext4_device_unregister(img);
@@ -369,7 +341,7 @@ static int dfs_ext_flush(struct dfs_fd *fd)
 {
     int error = RT_EOK;
 #ifdef RT_USING_SMART
-    error = ext4_cache_flush(fd->fnode->path);
+    error = ext4_cache_flush(fd->fnode->fullpath);
 #else
     error = ext4_cache_flush(fd->path);
 #endif
@@ -425,7 +397,7 @@ static int dfs_ext_open(struct dfs_fd* file)
         if (file->flags & O_CREAT)
         {
 #ifdef RT_USING_SMART
-            r = ext4_dir_mk(file->fnode->path);
+            r = ext4_dir_mk(file->fnode->fullpath);
 #else
             r = ext4_dir_mk(file->path);
 #endif
@@ -434,7 +406,7 @@ static int dfs_ext_open(struct dfs_fd* file)
         {
             dir = rt_malloc(sizeof(ext4_dir));
 #ifdef RT_USING_SMART
-            r = ext4_dir_open(dir, file->fnode->path);
+            r = ext4_dir_open(dir, file->fnode->fullpath);
 #else
             r = ext4_dir_open(dir, file->path);
 #endif
@@ -452,7 +424,7 @@ static int dfs_ext_open(struct dfs_fd* file)
     {
         f = rt_malloc(sizeof(ext4_file));
 #ifdef RT_USING_SMART
-        r = ext4_fopen2(f, file->fnode->path, file->flags);
+        r = ext4_fopen2(f, file->fnode->fullpath, file->flags);
 #else
         r = ext4_fopen2(f, file->path, file->flags);
 #endif
@@ -478,22 +450,45 @@ static int dfs_ext_open(struct dfs_fd* file)
 static int dfs_ext_unlink(struct dfs_filesystem *fs, const char *pathname)
 {
     int r;
+    char *stat_path;
 
     union {
         ext4_dir dir;
         ext4_file f;
     } var;
 
-    r = ext4_dir_open(&(var.dir), pathname);
+    if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
+    {
+        stat_path = (char *)pathname;
+    }
+    else
+    {
+        //printf("fs->path:%s,path: %s\n", fs->path, path);
+        if (strlen(fs->path) != 1)
+        {
+            stat_path = malloc(strlen(fs->path) + strlen(pathname) + 1);
+            //stat_path = fs->path + path;
+            snprintf((char *)stat_path, strlen(fs->path) + strlen(pathname) + 1, "%s%s", fs->path, pathname);
+        }
+        else
+        {
+            stat_path = (char *)pathname;
+        }
+        
+        printf("stat_path:%s\n", stat_path);
+    }
+
+    r = ext4_dir_open(&(var.dir), stat_path);
     if (0 == r)
     {
         (void) ext4_dir_close(&(var.dir));
-        ext4_dir_rm(pathname);
+        ext4_dir_rm(stat_path);
         
     }
     else
     {
-        r = ext4_fremove(pathname);
+        r = ext4_fremove(stat_path);
+        printf("dfs_ext_unlink r:%d\n", r);
     }
 
     return -r;
@@ -503,27 +498,43 @@ static int dfs_ext_stat(struct dfs_filesystem* fs, const char *path, struct stat
 {
     int r;
     uint32_t mode = 0;
+    char *stat_path;
 
     union {
         ext4_dir dir;
         ext4_file f;
     } var;
-
-    r = ext4_dir_open(&(var.dir), path);
+    if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
+    {
+        stat_path = (char *)path;
+    }
+    else
+    {
+        if (strlen(fs->path) != 1)
+        {
+            stat_path = malloc(strlen(fs->path) + strlen(path) + 1);
+            snprintf((char *)stat_path, strlen(fs->path) + strlen(path) + 1, "%s%s", fs->path, path);
+        }
+        else
+        {
+            stat_path = (char *)path;
+        }
+    }
+    r = ext4_dir_open(&(var.dir), stat_path);
 
     if(0 == r)
     {
         (void) ext4_dir_close(&(var.dir));
-        ext4_mode_get(path, &mode);
+        ext4_mode_get(stat_path, &mode);
         st->st_mode = mode;
         st->st_size = var.dir.f.fsize;
     }
     else
     {
-        r = ext4_fopen(&(var.f), path, "rb");
+        r = ext4_fopen(&(var.f), stat_path, "rb");
         if( 0 == r)
         {   
-            ext4_mode_get(path, &mode);
+            ext4_mode_get(stat_path, &mode);
             st->st_mode = mode;
             st->st_size = ext4_fsize(&(var.f));
             (void)ext4_fclose(&(var.f));
@@ -633,6 +644,7 @@ static int blockdev_open(struct ext4_blockdev *bdev)
     uint8_t index = get_bdev(bdev);
     rt_device_t device = disk[index];
     struct rt_device_blk_geometry geometry;
+    struct dfs_partition part;
 
     RT_ASSERT(index < RT_DFS_EXT_DRIVES);
     RT_ASSERT(device);
@@ -655,6 +667,13 @@ static int blockdev_open(struct ext4_blockdev *bdev)
         bdev->part_size = geometry.sector_count*geometry.bytes_per_sector;
         bdev->bdif->ph_bsize = geometry.block_size;
         disk_sector_size[index] = geometry.bytes_per_sector;
+        bdev->bdif->ph_bcnt = bdev->part_size / bdev->bdif->ph_bsize;
+    }
+
+    r = rt_device_control(device, RT_DEVICE_CTRL_BLK_PARTITION, &part);
+    if (RT_EOK == r)
+    {
+        bdev->part_offset = part.offset * 512;
         bdev->bdif->ph_bcnt = bdev->part_size / bdev->bdif->ph_bsize;
     }
 
