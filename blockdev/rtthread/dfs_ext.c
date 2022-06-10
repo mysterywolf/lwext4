@@ -319,21 +319,24 @@ static int dfs_ext_read(struct dfs_fd *fd, void *buf, size_t count)
     {
         bytesread = 0;
     }
-
     return bytesread;
 }
 
 static int dfs_ext_write(struct dfs_fd *fd, const void *buf, size_t count)
 {
     size_t byteswritten = 0;
+    ext4_file *file = fd->data;
     int r;
 
-    r = ext4_fwrite(fd->data, buf, count, &byteswritten);
+    r = ext4_fwrite(file, buf, count, &byteswritten);
     if (0 != r)
     {
         byteswritten = 0;
     }
-
+#ifdef RT_USING_SMART
+    fd->pos = file->fpos;
+    fd->fnode->size = ext4_fsize(file);
+#endif
     return byteswritten;
 }
 
@@ -356,8 +359,13 @@ static int dfs_ext_flush(struct dfs_fd *fd)
 static int dfs_ext_lseek(struct dfs_fd* file, off_t offset)
 {
     int r;
+    ext4_file *ext_file = file->data;
 
-    r = ext4_fseek(file->data, (int64_t)offset, SEEK_SET);
+    r = ext4_fseek(ext_file, (int64_t)offset, SEEK_SET);
+    if (r == RT_EOK)
+    {
+        return ext_file->fpos;
+    }
 
     return -r;
 }
@@ -463,19 +471,15 @@ static int dfs_ext_unlink(struct dfs_filesystem *fs, const char *pathname)
     }
     else
     {
-        //printf("fs->path:%s,path: %s\n", fs->path, path);
         if (strlen(fs->path) != 1)
         {
             stat_path = malloc(strlen(fs->path) + strlen(pathname) + 1);
-            //stat_path = fs->path + path;
             snprintf((char *)stat_path, strlen(fs->path) + strlen(pathname) + 1, "%s%s", fs->path, pathname);
         }
         else
         {
             stat_path = (char *)pathname;
         }
-        
-        printf("stat_path:%s\n", stat_path);
     }
 
     r = ext4_dir_open(&(var.dir), stat_path);
@@ -488,7 +492,6 @@ static int dfs_ext_unlink(struct dfs_filesystem *fs, const char *pathname)
     else
     {
         r = ext4_fremove(stat_path);
-        printf("dfs_ext_unlink r:%d\n", r);
     }
 
     return -r;

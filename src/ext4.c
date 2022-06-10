@@ -1735,7 +1735,6 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt)
     iblock_idx = (uint32_t)((file->fpos) / block_size);
     iblock_last = (uint32_t)((file->fpos + size) / block_size);
     unalg = (file->fpos) % block_size;
-
     /*If the size of symlink is smaller than 60 bytes*/
     bool softlink;
     softlink = ext4_inode_is_type(sb, ref.inode, EXT4_INODE_MODE_SOFTLINK);
@@ -1765,7 +1764,7 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt)
         r = ext4_fs_get_inode_dblk_idx(&ref, iblock_idx, &fblock, true);
         if (r != EOK)
             goto Finish;
-
+        
         /* Do we get an unwritten range? */
         if (fblock != 0) {
             uint64_t off = fblock * block_size + unalg;
@@ -1840,6 +1839,7 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt)
         if (rcnt)
             *rcnt += size;
     }
+    
 
 Finish:
     ext4_fs_put_inode_ref(&ref);
@@ -1899,7 +1899,6 @@ int ext4_fwrite(ext4_file *file, const void *buf, size_t size, size_t *wcnt)
     ifile_blocks = (uint32_t)((file->fsize + block_size - 1) / block_size);
 
     unalg = (file->fpos) % block_size;
-
     if (unalg) {
         size_t len =  size;
         uint64_t off;
@@ -2944,7 +2943,7 @@ int ext4_dir_rm(const char *path)
     {
         path += 1;
     }
-    printf("ext4_dir_rm path:%s\n", path);
+
     len = ext4_path_check(path, &is_goal);
     inode_current = f.inode;
 
