@@ -528,6 +528,11 @@ static int dfs_ext_stat(struct dfs_filesystem* fs, const char *path, struct stat
 {
     int r;
     uint32_t mode = 0;
+    uint32_t uid;
+    uint32_t gid;
+    uint32_t atime;
+    uint32_t mtime;
+    uint32_t ctime;
     char *stat_path;
 
     union {
@@ -556,8 +561,17 @@ static int dfs_ext_stat(struct dfs_filesystem* fs, const char *path, struct stat
     {
         (void) ext4_dir_close(&(var.dir));
         ext4_mode_get(stat_path, &mode);
+        ext4_owner_get(stat_path, &uid, &gid);
+        ext4_atime_get(stat_path, &atime);
+        ext4_mtime_get(stat_path, &mtime);
+        ext4_ctime_get(stat_path, &ctime);
         st->st_mode = mode;
         st->st_size = var.dir.f.fsize;
+        st->st_uid = uid;
+        st->st_gid = gid;
+        st->st_atime = atime;
+        st->st_mtime = mtime;
+        st->st_ctime = ctime;
     }
     else
     {
@@ -565,8 +579,17 @@ static int dfs_ext_stat(struct dfs_filesystem* fs, const char *path, struct stat
         if( 0 == r)
         {   
             ext4_mode_get(stat_path, &mode);
+            ext4_owner_get(stat_path, &uid, &gid);
+            ext4_atime_get(stat_path, &atime);
+            ext4_mtime_get(stat_path, &mtime);
+            ext4_ctime_get(stat_path, &ctime);
             st->st_mode = mode;
             st->st_size = ext4_fsize(&(var.f));
+            st->st_uid = uid;
+            st->st_gid = gid;
+            st->st_atime = atime;
+            st->st_mtime = mtime;
+            st->st_ctime = ctime;            
             (void)ext4_fclose(&(var.f));
         }
     }
