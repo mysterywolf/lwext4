@@ -297,13 +297,34 @@ static int dfs_ext_statfs(struct dfs_filesystem *fs, struct statfs *buf)
     return error;
 
 }
-static int dfs_ext_ioctl(struct dfs_fd* file, int cmd, void* args)
+static int dfs_ext_ioctl(struct dfs_fd* fd, int cmd, void* args)
 {
+    int r = RT_EOK;
     switch (cmd)
     {
+    case RT_FIOFTRUNCATE:
+        {
+            ext4_file *file = fd->data;
+            uint64_t fpos, length;
+
+            RT_ASSERT(file != RT_NULL);
+            fpos = file->fpos;
+            length = *(uint64_t *)args;
+            if (length <= ext4_fsize(file))
+            {
+                file->fpos = length;
+                r = ext4_ftruncate(file, length);
+            }
+            else
+            {
+                r = ext4_fseek(file, (int64_t)length, SEEK_SET);
+            }
+            file->fpos = fpos;
+            return r;
+        }
     case F_GETLK:
             return 0;
-    case F_SETLK:
+    case F_SETLK:   
             return 0;
     }
     return -RT_EIO;
@@ -312,13 +333,18 @@ static int dfs_ext_ioctl(struct dfs_fd* file, int cmd, void* args)
 static int dfs_ext_read(struct dfs_fd *fd, void *buf, size_t count)
 {
     size_t bytesread = 0;
+    ext4_file *file = fd->data;
     int r;
 
-    r = ext4_fread(fd->data, buf, count, &bytesread);
+    RT_ASSERT(file != RT_NULL);
+    r = ext4_fread(file, buf, count, &bytesread);
     if (0 != r)
     {
         bytesread = 0;
     }
+#ifdef RT_USING_SMART
+    fd->pos = file->fpos;
+#endif    
     return bytesread;
 }
 
@@ -328,6 +354,7 @@ static int dfs_ext_write(struct dfs_fd *fd, const void *buf, size_t count)
     ext4_file *file = fd->data;
     int r;
 
+    RT_ASSERT(file != RT_NULL);
     r = ext4_fwrite(file, buf, count, &byteswritten);
     if (0 != r)
     {
