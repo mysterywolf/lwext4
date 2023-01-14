@@ -84,6 +84,8 @@ struct ext4_buf {
 
     /**@brief   Reference count table*/
     uint32_t refctr;
+    /* refcount for read */
+    uint32_t read_refctr;
 
     /**@brief   The block cache this buffer belongs to. */
     struct ext4_bcache *bc;
@@ -185,9 +187,11 @@ static inline void ext4_bcache_clear_dirty(struct ext4_buf *buf) {
 
 /**@brief   Increment reference counter of buf by 1.*/
 #define ext4_bcache_inc_ref(buf) ((buf)->refctr++)
+#define ext4_bcache_inc_read_ref(buf) ((buf)->read_refctr++)
 
 /**@brief   Decrement reference counter of buf by 1.*/
 #define ext4_bcache_dec_ref(buf) ((buf)->refctr--)
+#define ext4_bcache_dec_read_ref(buf) ((buf)->read_refctr--)
 
 /**@brief   Insert buffer to dirty cache list
  * @param   bc block cache descriptor

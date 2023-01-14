@@ -20,6 +20,7 @@ src/ext4_ialloc.c
 src/ext4_inode.c
 src/ext4_journal.c
 src/ext4_mkfs.c
+src/ext4_mp.c
 src/ext4_super.c
 src/ext4_trans.c
 src/ext4_xattr.c
@@ -32,7 +33,7 @@ CPPDEFINES = ['CONFIG_USE_DEFAULT_CFG', 'CONFIG_HAVE_OWN_OFLAGS=0']
 
 LOCAL_CCFLAGS = ''
 
-group = DefineGroup('Filesystem', objs, 
+group = DefineGroup('Filesystem', objs,
             depend = ['RT_USING_DFS', 'RT_USING_DFS_LWEXT4'],
             CPPPATH = CPPPATH,
             CPPDEFINES = CPPDEFINES,

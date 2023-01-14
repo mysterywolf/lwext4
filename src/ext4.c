@@ -53,48 +53,10 @@
 #include <ext4_xattr.h>
 #include <ext4_journal.h>
 
+#include "ext4_mp.h"
 
 #include <stdlib.h>
 #include <string.h>
-
-/**@brief   Mount point OS dependent lock*/
-#define EXT4_MP_LOCK(_m)                                                       \
-    do {                                                                   \
-        if ((_m)->os_locks)                                            \
-            (_m)->os_locks->lock();                                \
-    } while (0)
-
-/**@brief   Mount point OS dependent unlock*/
-#define EXT4_MP_UNLOCK(_m)                                                     \
-    do {                                                                   \
-        if ((_m)->os_locks)                                            \
-            (_m)->os_locks->unlock();                              \
-    } while (0)
-
-/**@brief   Mount point descriptor.*/
-struct ext4_mountpoint {
-
-    /**@brief   Mount done flag.*/
-    bool mounted;
-
-    /**@brief   Mount point name (@ref ext4_mount)*/
-    char name[CONFIG_EXT4_MAX_MP_NAME + 1];
-
-    /**@brief   OS dependent lock/unlock functions.*/
-    const struct ext4_lock *os_locks;
-
-    /**@brief   Ext4 filesystem internals.*/
-    struct ext4_fs fs;
-
-    /**@brief   JBD fs.*/
-    struct jbd_fs jbd_fs;
-
-    /**@brief   Journal.*/
-    struct jbd_journal jbd_journal;
-
-    /**@brief   Block cache.*/
-    struct ext4_bcache bc;
-};
 
 /**@brief   Mountpoints.*/
 static struct ext4_mountpoint s_mp[CONFIG_EXT4_MOUNTPOINTS_COUNT];
@@ -1967,29 +1929,30 @@ Finish:
 
 int ext4_fseek(ext4_file *file, int64_t offset, uint32_t origin)
 {
+    int ret = EOK;
+    int64_t new_offset;
+
     switch (origin) {
     case SEEK_SET:
-        if (offset < 0)
-            return EINVAL;
+        new_offset = offset;
+        break;
 
-        file->fpos = offset;
-        return EOK;
     case SEEK_CUR:
-        if ((offset < 0 && (uint64_t)(-offset) > file->fpos) ||
-            (offset > 0 &&
-             (uint64_t)offset > (file->fsize - file->fpos)))
-            return EINVAL;
+        new_offset = file->fpos + offset;
+        break;
 
-        file->fpos += offset;
-        return EOK;
     case SEEK_END:
-        if (offset < 0 || (uint64_t)offset > file->fsize)
-            return EINVAL;
-
-        file->fpos = file->fsize - offset;
-        return EOK;
+        new_offset = file->fsize + offset;
+        break;
     }
-    return EINVAL;
+
+    if (new_offset < 0) ret = EINVAL;
+    else
+    {
+        file->fpos = new_offset;
+    }
+
+    return ret;
 }
 
 uint64_t ext4_ftell(ext4_file *file)
@@ -2022,6 +1985,8 @@ static int ext4_trans_get_inode_ref(const char *path,
         return r;
     }
 
+    ext4_bcache_inc_read_ref(inode_ref->block.buf);
+
     return r;
 }
 
@@ -2030,6 +1995,7 @@ static int ext4_trans_put_inode_ref(struct ext4_mountpoint *mp,
 {
     int r;
 
+    ext4_bcache_dec_read_ref(inode_ref->block.buf);
     r = ext4_fs_put_inode_ref(inode_ref);
     if (r != EOK)
         ext4_trans_abort(mp);
@@ -2090,6 +2056,34 @@ int ext4_inode_exist(const char *path, int type)
     EXT4_MP_UNLOCK(mp);
 
     return r;
+}
+
+void* ext4_get_inode_ref(const char *path, struct ext4_inode_ref *ref)
+{
+    int ret;
+    struct ext4_mountpoint *mp = ext4_get_mount(path);
+
+    if (!mp)
+        return NULL;
+
+    EXT4_MP_LOCK(mp);
+    ret = ext4_trans_get_inode_ref(path, mp, ref);
+    EXT4_MP_UNLOCK(mp);
+
+    if (ret != EOK) mp = NULL;
+
+    return mp;
+}
+
+int ext4_put_inode_ref(struct ext4_mountpoint *mp, struct ext4_inode_ref *ref)
+{
+    int ret = EOK;
+
+    EXT4_MP_LOCK(mp);
+    ret = ext4_trans_put_inode_ref(mp, ref);
+    EXT4_MP_UNLOCK(mp);
+
+    return ret;
 }
 
 int ext4_mode_set(const char *path, uint32_t mode)

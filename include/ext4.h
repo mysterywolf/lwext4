@@ -50,6 +50,8 @@ extern "C" {
 #include <ext4_errno.h>
 #include <ext4_oflags.h>
 #include <ext4_debug.h>
+#include <ext4_inode.h>
+#include <ext4_fs.h>
 
 #include <ext4_blockdev.h>
 
@@ -389,6 +391,9 @@ int ext4_raw_inode_fill(const char *path, uint32_t *ret_ino,
  *
  * @return  Standard error code.*/
 int ext4_inode_exist(const char *path, int type);
+
+void* ext4_get_inode_ref(const char *path, struct ext4_inode_ref *ref);
+int ext4_put_inode_ref(struct ext4_mountpoint *mp, struct ext4_inode_ref *ref);
 
 /**@brief Change file/directory/link mode bits.
  *

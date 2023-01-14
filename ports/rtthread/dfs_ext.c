@@ -12,11 +12,15 @@
  * 2023-01-15     bernard           add RT-Thread 5.0.x support
  */
 
-#include <rtthread.h>
 #include <string.h>
+
+#include <rtthread.h>
+
 #include <dfs.h>
 #include <dfs_fs.h>
 #include <dfs_file.h>
+#include <dfs_mnt.h>
+#include <dfs_dentry.h>
 
 #include "ext4.h"
 #include "ext4_mkfs.h"
@@ -25,11 +29,32 @@
 #include "ext4_errno.h"
 #include "ext4_mbr.h"
 #include "ext4_super.h"
-#include "ext4_debug.h"
-#include "ext4_inode.h"
+#include "ext4_fs.h"
+#include <ext4_mp.h>
 
 #include "dfs_ext.h"
 #include "dfs_ext_blockdev.h"
+
+#ifdef PKG_USING_DLOG
+#include <dlog.h>
+#else
+#define DLOG(...)
+#endif
+
+struct dfs_ext4_file
+{
+    uint32_t type;  /* EXT4_DE_DIR or EXT4_DE_REG_FILE */
+    union {
+        ext4_file file;
+        ext4_dir dir;
+    } entry;
+};
+
+struct dfs_ext4_vnode
+{
+    struct ext4_mountpoint *mp;
+    struct ext4_inode_ref inode_ref;
+};
 
 static rt_mutex_t ext4_mutex = RT_NULL;
 
@@ -64,73 +89,255 @@ static void ext4_unlock(void)
     return ;
 }
 
-rt_inline const char *get_fd_file(struct dfs_file *fd)
+/* update vnode information */
+rt_inline int ext4_vnode_update_info(struct dfs_vnode *vnode)
 {
-    const char *fn = NULL;
+    struct dfs_ext4_vnode *ext_vnode;
 
-    if (fd)
+    if (vnode && vnode->data)
     {
-#if (RTTHREAD_VERSION >= RT_VERSION_CHECK(5, 0, 0))
-        fn = fd->vnode->fullpath;
-#else
-        fn = fd->path;
-#endif
+        ext_vnode = (struct dfs_ext4_vnode *)vnode->data;
+        if (ext_vnode)
+        {
+            vnode->mode = ext4_inode_get_mode(&ext_vnode->mp->fs.sb, ext_vnode->inode_ref.inode);
+            vnode->uid = ext4_inode_get_uid(ext_vnode->inode_ref.inode);
+            vnode->gid = ext4_inode_get_gid(ext_vnode->inode_ref.inode);
+            vnode->atime.tv_sec = ext4_inode_get_access_time(ext_vnode->inode_ref.inode);
+            vnode->mtime.tv_sec = ext4_inode_get_modif_time(ext_vnode->inode_ref.inode);
+            vnode->ctime.tv_sec = ext4_inode_get_change_inode_time(ext_vnode->inode_ref.inode);
+        }
     }
 
-    return fn;
+    return 0;
 }
 
-static int dfs_ext_mount(struct dfs_filesystem *fs, unsigned long rwflag, const void *data)
+/* file system ops */
+
+static struct dfs_vnode* dfs_ext_lookup(struct dfs_dentry *dentry)
+{
+    char *fn = RT_NULL;
+    struct dfs_vnode *vnode = RT_NULL;
+    struct dfs_ext4_vnode *ext_vnode = RT_NULL;
+
+    ext_vnode = (struct dfs_ext4_vnode *) rt_calloc (1, sizeof(struct dfs_ext4_vnode));
+    if (ext_vnode)
+    {
+        fn = dfs_dentry_full_path(dentry);
+        if (fn)
+        {
+            DLOG(msg, "ext", "vnode", DLOG_MSG, "dfs_vnode_create()");
+            vnode = dfs_vnode_create();
+            if (vnode)
+            {
+                ext_vnode->mp = ext4_get_inode_ref(fn, &(ext_vnode->inode_ref));
+                if (ext_vnode->mp)
+                {
+                    /* found entry */
+                    int type = ext4_inode_type(&(ext_vnode->mp->fs.sb), ext_vnode->inode_ref.inode);
+                    switch (type)
+                    {
+                    case EXT4_INODE_MODE_FILE:
+                        vnode->type = FT_REGULAR;
+                        vnode->size = ext4_inode_get_size(&(ext_vnode->mp->fs.sb), ext_vnode->inode_ref.inode);
+                        break;
+                    case EXT4_INODE_MODE_DIRECTORY:
+                        vnode->type = FT_DIRECTORY;
+                        vnode->size = 0;
+                        break;
+                    case EXT4_INODE_MODE_SOFTLINK:
+                        vnode->type = FT_SYMLINK;
+                        vnode->size = 0;
+                        break;
+                    }
+
+                    vnode->nlink = 1;
+                    DLOG(msg, "ext", "mnt", DLOG_MSG, "dfs_mnt_ref(dentry->mnt, name=%s)", dentry->mnt->fs_ops->name);
+                    vnode->mnt = dfs_mnt_ref(dentry->mnt);
+                    vnode->data = (void*) ext_vnode;
+
+                    ext4_vnode_update_info(vnode);
+                }
+                else
+                {
+                    /* free vnode */
+                    DLOG(msg, "ext", "vnode", DLOG_MSG, "dfs_vnode_destroy(no entry)");
+                    dfs_vnode_destroy(vnode);
+                    vnode = RT_NULL;
+                }
+            }
+            rt_free(fn);
+        }
+    }
+
+    return vnode;
+}
+
+static struct dfs_vnode* dfs_ext_create_vnode(struct dfs_dentry *dentry, int type, mode_t mode)
+{
+    int ret = 0;
+    char *fn = NULL;
+    struct dfs_vnode *vnode = RT_NULL;
+    struct dfs_ext4_vnode *ext_vnode = RT_NULL;
+
+    vnode = dfs_vnode_create();
+    if (vnode)
+    {
+        fn = dfs_dentry_full_path(dentry);
+        if (fn)
+        {
+            ext_vnode = (struct dfs_ext4_vnode *) rt_malloc (sizeof(struct dfs_ext4_vnode));
+            if (ext_vnode)
+            {
+                if (type == FT_DIRECTORY)
+                {
+                    /* create dir */
+                    ret = ext4_dir_mk(fn);
+                    if (ret == EOK)
+                    {
+                        ext4_mode_set(fn, mode);
+                        ext_vnode->mp = ext4_get_inode_ref(fn, &(ext_vnode->inode_ref));
+                        if (ext_vnode->mp)
+                        {
+                            vnode->type = FT_DIRECTORY;
+                            vnode->size = 0;
+                        }
+                        else
+                        {
+                            rt_kprintf("get inode ref failed: %s\n", fn);
+                        }
+                    }
+                }
+                else if (type == FT_REGULAR)
+                {
+                    ext4_file file;
+                    /* create file */
+                    ret = ext4_fopen2(&file, fn, O_CREAT);
+                    if (ret == EOK)
+                    {
+                        ext4_fclose(&file);
+
+                        ext4_mode_set(fn, mode);
+                        ext_vnode->mp = ext4_get_inode_ref(fn, &(ext_vnode->inode_ref));
+                        if (ext_vnode->mp)
+                        {
+                            vnode->type = FT_REGULAR;
+                            vnode->size = ext4_inode_get_size(&(ext_vnode->mp->fs.sb), ext_vnode->inode_ref.inode);
+                        }
+                    }
+                }
+
+                vnode->data = ext_vnode;
+            }
+
+            rt_free(fn);
+            fn = NULL;
+
+            if (ret != EOK)
+            {
+                rt_free(ext_vnode);
+                ext_vnode = NULL;
+
+                dfs_vnode_destroy(vnode);
+                vnode = NULL;
+            }
+        }
+        else
+        {
+            dfs_vnode_destroy(vnode);
+            vnode = NULL;
+        }
+    }
+
+    return vnode;
+}
+
+static int dfs_ext_free_vnode(struct dfs_vnode* vnode)
+{
+    if (vnode)
+    {
+        struct dfs_ext4_vnode *ext_vnode;
+
+        if (vnode->data)
+        {
+            ext_vnode = (struct dfs_ext4_vnode *)vnode->data;
+            if (ext_vnode)
+            {
+                ext4_put_inode_ref(ext_vnode->mp, &(ext_vnode->inode_ref));
+                rt_free(ext_vnode);
+            }
+
+            vnode->data = RT_NULL;
+        }
+    }
+
+    return RT_EOK;
+}
+
+static struct dfs_dentry *dfs_ext_mount(struct dfs_mnt *mnt, unsigned long rwflag, const void *data)
 {
     int rc = 0;
+    struct dfs_dentry *root = NULL;
     struct ext4_blockdev *bd = NULL;
     struct dfs_ext4_blockdev *dbd = NULL;
 
+    root = dfs_dentry_create("/");
+    DLOG(msg, "ext", "mnt", DLOG_MSG, "dfs_mnt_ref(mnt.name=%s)", mnt->fs_ops->name);
+    root->mnt = dfs_mnt_ref(mnt);
+
     /* create dfs ext4 block device */
-    dbd = dfs_ext4_blockdev_create(fs->dev_id);
-    if (!dbd) return -RT_ERROR;
+    dbd = dfs_ext4_blockdev_create(root->mnt->dev_id);
+    if (!dbd) return RT_NULL;
 
     bd = &dbd->bd;
-    rc = ext4_mount(bd, fs->path, false);
-    if (rc != RT_EOK)
+    rc = ext4_mount(bd, mnt->fullpath, false);
+    if (rc != EOK)
     {
+        dfs_dentry_unref(root);
+        root = NULL;
+
         dfs_ext4_blockdev_destroy(dbd);
         rc = -rc;
     }
     else
     {
-        ext4_mount_setup_locks(fs->path, &ext4_lock_ops);
+        ext4_mount_setup_locks(mnt->fullpath, &ext4_lock_ops);
         /* set file system data to dbd */
-        fs->data = (void*)dbd;
+        mnt->data = (void*) dbd;
+
+        DLOG(msg, "ext", "ext", DLOG_MSG, "dfs_ext_lookup(dentry.name=%s)", root->pathname);
+        root->vnode = dfs_ext_lookup(root);
+        if (!root->vnode)
+        {
+            DLOG(msg, "ext", "ext", DLOG_MSG_RET, "lookup failed(dentry.name=%s)", root->pathname);
+            dfs_dentry_unref(root);
+            return RT_NULL;
+        }
     }
 
-    return rc;
+    return root;
 }
 
-static int dfs_ext_unmount(struct dfs_filesystem *fs)
+static int dfs_ext_unmount(struct dfs_mnt *mnt)
 {
-    int rc = -RT_ERROR;
+    int rc;
     struct dfs_ext4_blockdev *dbd = NULL;
 
-    dbd = (struct dfs_ext4_blockdev *)fs->data;
+    dbd = (struct dfs_ext4_blockdev *)mnt->data;
     if (dbd)
     {
-        char *mp = fs->path; /*mount point */
+        char *mp = mnt->fullpath; /*mount point */
+
+        /* unref root dentry firstly */
+        dfs_dentry_unref(mnt->root);
+        mnt->root = RT_NULL;
 
         rc = ext4_umount(mp);
         if (rc == 0)
         {
             dfs_ext4_blockdev_destroy(dbd);
         }
-        else
-        {
-            rc = -rc;
-        }
     }
-    else
-    {
-        rc = -RT_EINVAL;
-    }
+
     return rc;
 }
 
@@ -171,120 +378,111 @@ static int dfs_ext_mkfs(rt_device_t devid, const char *fs_name)
     return rc;
 }
 
-static int dfs_ext_statfs(struct dfs_filesystem *fs, struct statfs *buf)
+static int dfs_ext_statfs(struct dfs_mnt *mnt, struct statfs *buf)
 {
     struct ext4_sblock *sb = NULL;
     int error = RT_EOK;
 
-    error = ext4_get_sblock(fs->path, &sb);
-    if (error != RT_EOK)
+    if (mnt)
     {
-        return -error;
+        error = ext4_get_sblock(mnt->fullpath, &sb);
+        if (error != RT_EOK)
+        {
+            return -error;
+        }
+
+        buf->f_bsize = ext4_sb_get_block_size(sb);
+        buf->f_blocks = ext4_sb_get_blocks_cnt(sb);
+        buf->f_bfree = ext4_sb_get_free_blocks_cnt(sb);
     }
 
-    buf->f_bsize = ext4_sb_get_block_size(sb);
-    buf->f_blocks = ext4_sb_get_blocks_cnt(sb);
-    buf->f_bfree = ext4_sb_get_free_blocks_cnt(sb);
-    //TODO this is not accurate, because it is free blocks available to unprivileged user, but ...
-    buf->f_bavail = buf->f_bfree;
     return error;
-
-}
-static int dfs_ext_ioctl(struct dfs_file *fd, int cmd, void *args)
-{
-    int r = RT_EOK;
-    switch (cmd)
-    {
-    case RT_FIOFTRUNCATE:
-    {
-        ext4_file *file = fd->data;
-        uint64_t fpos, length;
-
-        RT_ASSERT(file != RT_NULL);
-        fpos = file->fpos;
-        length = *(uint64_t *)args;
-        if (length <= ext4_fsize(file))
-        {
-            file->fpos = length;
-            r = ext4_ftruncate(file, length);
-        }
-        else
-        {
-            r = ext4_fseek(file, (int64_t)length, SEEK_SET);
-        }
-        file->fpos = fpos;
-        return r;
-    }
-    case F_GETLK:
-        return 0;
-    case F_SETLK:
-        return 0;
-    }
-    return -RT_EIO;
 }
 
-static int dfs_ext_read(struct dfs_file *fd, void *buf, size_t count)
+/* file ops */
+
+static int dfs_ext_read(struct dfs_file *fd, void *buf, size_t count, off_t *pos)
 {
-    size_t bytesread = 0;
-    ext4_file *file = fd->data;
     int r;
+    size_t bytesread = 0;
+    struct dfs_ext4_file *ext_file;
 
-    RT_ASSERT(file != RT_NULL);
-    r = ext4_fread(file, buf, count, &bytesread);
-    if (r != 0)
+    if (fd && fd->data)
     {
-        bytesread = 0;
+        ext_file = (struct dfs_ext4_file *) fd->data;
+
+        r = ext4_fread(&ext_file->entry.file, buf, count, &bytesread);
+        if (r != 0)
+        {
+            bytesread = 0;
+        }
+        *pos = ext4_fsize(&(ext_file->entry.file));
     }
-#if (RTTHREAD_VERSION >= RT_VERSION_CHECK(5, 0, 0))
-    fd->pos = file->fpos;
-#endif
 
     return bytesread;
 }
 
-static int dfs_ext_write(struct dfs_file *fd, const void *buf, size_t count)
+static int dfs_ext_write(struct dfs_file *fd, const void *buf, size_t count, off_t *pos)
 {
-    size_t byteswritten = 0;
-    ext4_file *file = fd->data;
     int r;
+    size_t byteswritten = 0;
+    struct dfs_ext4_file *ext_file;
 
-    RT_ASSERT(file != RT_NULL);
-    r = ext4_fwrite(file, buf, count, &byteswritten);
-    if (r != 0)
+    if (fd && fd->data)
     {
-        byteswritten = 0;
-    }
+        ext_file = (struct dfs_ext4_file *) fd->data;
 
-#if (RTTHREAD_VERSION >= RT_VERSION_CHECK(5, 0, 0))
-    fd->pos = file->fpos;
-    fd->vnode->size = ext4_fsize(file);
-#endif
+        r = ext4_fwrite(&(ext_file->entry.file), buf, count, &byteswritten);
+        if (r != 0)
+        {
+            byteswritten = 0;
+        }
+
+        fd->vnode->size = ext4_fsize(&(ext_file->entry.file));
+        *pos = fd->vnode->size;
+    }
 
     return byteswritten;
 }
 
 static int dfs_ext_flush(struct dfs_file *fd)
 {
+    char *fn = RT_NULL;
     int error = RT_EOK;
 
-    error = ext4_cache_flush(get_fd_file(fd));
+    if (fd && fd->dentry)
+    {
+        fn = dfs_dentry_full_path(fd->dentry);
+        if (fn)
+        {
+            error = ext4_cache_flush(fn);
+
+            rt_free(fn);
+        }
+    }
+
     if (error != RT_EOK)
     {
-        return -error;
+        error = -error;
     }
 
     return error;
 }
 
-static int dfs_ext_lseek(struct dfs_file *fd, off_t offset)
+static int dfs_ext_lseek(struct dfs_file *fd, off_t offset, int whence)
 {
     int r;
-    ext4_file *file = fd->data;
+    struct dfs_ext4_file *ext_file;
 
-    r = ext4_fseek(file, (int64_t)offset, SEEK_SET);
-    if (r == RT_EOK)
+    if (fd && fd->data)
     {
-        return file->fpos;
+        ext_file = (struct dfs_ext4_file *)fd->data;
+
+        r = ext4_fseek(&(ext_file->entry.file), (int64_t)offset, whence);
+        if (r == RT_EOK)
+        {
+            return ext_file->entry.file.fpos;
+        }
     }
 
     return -r;
@@ -292,243 +490,273 @@ static int dfs_ext_lseek(struct dfs_file *fd, off_t offset)
 
 static int dfs_ext_close(struct dfs_file *file)
 {
-    int r;
+    int ret = 0;
+    struct dfs_ext4_file *ext_file = RT_NULL;
 
-    r = ext4_fclose(file->data);
-    if (r == EOK)
+    if (file)
     {
-        rt_free(file->data);
-        file->data = NULL;
+        ext_file = (struct dfs_ext4_file *) file->data;
+        if (ext_file)
+        {
+            if (ext_file->type == FT_DIRECTORY)
+            {
+                ret = ext4_dir_close(&ext_file->entry.dir);
+            }
+            else if (ext_file->type == FT_REGULAR)
+            {
+                ret = ext4_fclose(&ext_file->entry.file);
+            }
+
+            if (ret == EOK)
+            {
+                rt_free(ext_file);
+                file->data = NULL;
+            }
+        }
     }
 
-    return -r;
+    return -ret;
 }
 
 static int dfs_ext_open(struct dfs_file *file)
 {
-    int r = EOK;
-    ext4_dir *dir;
-    ext4_file *f;
+    int ret = EOK;
+    struct dfs_ext4_vnode *ext_vnode = RT_NULL;
+    struct dfs_ext4_file *ext_file = RT_NULL;
 
-    if (file->flags & O_DIRECTORY)
+    if (file && file->vnode)
     {
-        if (file->flags & O_CREAT)
+        ext_vnode = (struct dfs_ext4_vnode *)file->vnode->data;
+        if (ext_vnode)
         {
-            r = ext4_dir_mk(get_fd_file(file));
-        }
-        if (EOK == r)
-        {
-            dir = rt_calloc(1, sizeof(ext4_dir));
-            if (dir)
+            ext_file = (struct dfs_ext4_file *) rt_malloc(sizeof(struct dfs_ext4_file));
+            if (ext_file)
             {
-                r = ext4_dir_open(dir, get_fd_file(file));
-                if (r == EOK)
+                int oflags;
+                char *fn = NULL;
+
+                ext_file->type = file->vnode->type;
+                oflags = dfs_oflags(file->flags);
+
+                fn = dfs_dentry_full_path(file->dentry);
+                if (fn)
                 {
-                    file->data = dir;
+                    if (file->vnode->type == FT_DIRECTORY)
+                    {
+                        /* open dir */
+                        ret = ext4_dir_open(&ext_file->entry.dir, fn);
+                        if (ret == EOK)
+                        {
+                            file->fpos = 0;
+                        }
+                    }
+                    else
+                    {
+                        /* open regular file */
+                        ret = ext4_fopen2(&ext_file->entry.file, fn, oflags);
+                        if (ret == EOK)
+                        {
+                            file->fpos = ext_file->entry.file.fpos;
+                        }
+                    }
+
+                    if (ret == EOK)
+                    {
+                        file->data = ext_file;
+                    }
+
+                    rt_free(fn);
                 }
                 else
                 {
-                    rt_free(dir);
+                    rt_free(ext_file);
+                    ext_file = NULL;
                 }
             }
         }
     }
     else
     {
-        f = rt_calloc(1, sizeof(ext4_file));
-        if (f)
-        {
-            r = ext4_fopen2(f, get_fd_file(file), file->flags);
-            if (r == EOK)
-            {
-                file->data = f;
-#if (RTTHREAD_VERSION >= RT_VERSION_CHECK(5, 0, 0))
-                file->vnode->flags = f->flags;
-                file->pos = f->fpos;
-                file->vnode->size = (size_t)f->fsize;
-#endif
-            }
-            else
-            {
-                rt_free(f);
-            }
-        }
+        ret = ENOENT;
     }
-    return -r;
+
+    return -ret;
 }
 
-static int dfs_ext_unlink(struct dfs_filesystem *fs, const char *pathname)
+static int dfs_ext_readlink(struct dfs_dentry *dentry, char *buf, int len)
 {
-    int r;
-    char *stat_path;
+    int ret = EOK;
+    char *fn = NULL;
 
-    union
+    if (dentry && buf)
     {
-        ext4_dir dir;
-        ext4_file f;
-    } var;
-
-    if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
-    {
-        stat_path = (char *)pathname;
-    }
-    else
-    {
-        if (strlen(fs->path) != 1)
+        fn = dfs_dentry_full_path(dentry);
+        if (fn)
         {
-            stat_path = malloc(strlen(fs->path) + strlen(pathname) + 1);
-            snprintf((char *)stat_path, strlen(fs->path) + strlen(pathname) + 1, "%s%s", fs->path, pathname);
+            size_t size;
+            ret = ext4_readlink(fn, buf, len, &size);
+            if (ret == EOK)
+            {
+                buf[size] = '\0';
+            }
+
+            rt_free(fn);
         }
         else
         {
-            stat_path = (char *)pathname;
+            ret = ENOMEM;
         }
     }
-
-    r = ext4_dir_open(&(var.dir), stat_path);
-    if (r == 0)
-    {
-        (void) ext4_dir_close(&(var.dir));
-        ext4_dir_rm(stat_path);
-
-    }
     else
     {
-        r = ext4_fremove(stat_path);
+        ret = EBADF;
     }
 
-    return -r;
+    return -ret;
 }
 
-static int dfs_ext_stat(struct dfs_filesystem *fs, const char *path, struct stat *st)
+static int dfs_ext_link(struct dfs_dentry *src_dentry, struct dfs_dentry *dst_dentry)
 {
-    int r;
-    uint32_t mode = 0;
-    uint32_t uid;
-    uint32_t gid;
-    uint32_t atime;
-    uint32_t mtime;
-    uint32_t ctime;
-    char *stat_path;
-    struct ext4_inode inode;
-    uint32_t ino = 0;
-    uint32_t dev = 0;
+    char *src_path = NULL, *dst_path = NULL;
 
-    union
-    {
-        ext4_dir dir;
-        ext4_file f;
-    } var;
+    src_path = dfs_dentry_full_path(src_dentry);
+    dst_path = dfs_dentry_full_path(dst_dentry);
 
-    if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
+    if (src_path && dst_path)
     {
-        stat_path = (char *)path;
+        ext4_flink(src_path, dst_path);
+
+        rt_free(src_path);
+        rt_free(dst_path);
+    }
+
+    return EOK;
+}
+
+static int dfs_ext_symlink(struct dfs_dentry *parent_dentry, const char *target, const char *linkpath)
+{
+    int ret = EOK;
+    char *fn = NULL;
+
+    if (parent_dentry && linkpath[0] != '/')
+    {
+        char *full = dfs_dentry_full_path(parent_dentry);
+        if (full)
+        {
+            fn = dfs_normalize_path(full, linkpath);
+            rt_free(full);
+        }
     }
     else
     {
-        if (strlen(fs->path) != 1)
+        fn = (char*) linkpath;
+    }
+
+    if (fn)
+    {
+        ret = ext4_fsymlink(target, fn);
+        if (fn != linkpath)
+            rt_free(fn);
+    }
+    else
+    {
+        ret = ENOMEM;
+    }
+
+    return -ret;
+}
+
+static int dfs_ext_unlink(struct dfs_dentry *dentry)
+{
+    int ret;
+    char *fn = NULL;
+    struct dfs_ext4_file file;
+
+    fn = dfs_dentry_full_path(dentry);
+    if (fn)
+    {
+        ret = ext4_dir_open(&(file.entry.dir), fn);
+        if (ret == 0)
         {
-            stat_path = malloc(strlen(fs->path) + strlen(path) + 1);
-            snprintf((char *)stat_path, strlen(fs->path) + strlen(path) + 1, "%s%s", fs->path, path);
+            (void) ext4_dir_close(&(file.entry.dir));
+            ret = ext4_dir_rm(fn);
         }
         else
         {
-            stat_path = (char *)path;
+            ret = ext4_fremove(fn);
         }
+
+        rt_free(fn);
     }
 
-    r = ext4_dir_open(&(var.dir), stat_path);
-    if (r == 0)
+    return -ret;
+}
+
+static int dfs_ext_stat(struct dfs_dentry *dentry, struct stat *st)
+{
+    int ret = 0;
+    char *stat_path;
+
+    stat_path = dfs_dentry_full_path(dentry);
+    if (stat_path)
     {
-        (void) ext4_dir_close(&(var.dir));
-        ext4_mode_get(stat_path, &mode);
-        ext4_owner_get(stat_path, &uid, &gid);
-        ext4_atime_get(stat_path, &atime);
-        ext4_mtime_get(stat_path, &mtime);
-        ext4_ctime_get(stat_path, &ctime);
+        struct ext4_inode_ref inode_ref;
+        struct ext4_mountpoint *mp = ext4_get_inode_ref(stat_path, &inode_ref);
 
-        if (ext4_raw_inode_fill(stat_path, &ino, &inode) == EOK)
+        if (mp)
         {
-            dev = ext4_inode_get_dev(&inode);
-        }
-        st->st_dev = (dev_t)(fs->dev_id);
-        st->st_ino = ino;
-        st->st_mode = mode;
-        st->st_size = var.dir.f.fsize;
-        st->st_uid = uid;
-        st->st_gid = gid;
-        st->st_atime = atime;
-        st->st_mtime = mtime;
-        st->st_ctime = ctime;
-    }
-    else
-    {
-        r = ext4_fopen(&(var.f), stat_path, "rb");
-        if (r == 0)
-        {
-            ext4_mode_get(stat_path, &mode);
-            ext4_owner_get(stat_path, &uid, &gid);
-            ext4_atime_get(stat_path, &atime);
-            ext4_mtime_get(stat_path, &mtime);
-            ext4_ctime_get(stat_path, &ctime);
-            if (ext4_raw_inode_fill(stat_path, &ino, &inode) == EOK)
-            {
-                dev = ext4_inode_get_dev(&inode);
-            }
-            st->st_dev = (dev_t)(fs->dev_id);
-            st->st_ino = ino;
-            st->st_mode = mode;
-            st->st_size = ext4_fsize(&(var.f));
-            st->st_uid = uid;
-            st->st_gid = gid;
-            st->st_atime = atime;
-            st->st_mtime = mtime;
-            st->st_ctime = ctime;
+            st->st_mode = ext4_inode_get_mode(&mp->fs.sb, inode_ref.inode);
+            st->st_uid = ext4_inode_get_uid(inode_ref.inode);
+            st->st_gid = ext4_inode_get_gid(inode_ref.inode);
+            st->st_size = ext4_inode_get_size(&mp->fs.sb, inode_ref.inode);
+            st->st_atime = ext4_inode_get_access_time(inode_ref.inode);
+            st->st_mtime = ext4_inode_get_modif_time(inode_ref.inode);
+            st->st_ctime = ext4_inode_get_change_inode_time(inode_ref.inode);
 
-            (void)ext4_fclose(&(var.f));
+            ext4_put_inode_ref(mp, &inode_ref);
         }
+        else
+        {
+            ret = ENOENT;
+        }
+
+        rt_free(stat_path);
     }
 
-    if (r == 0)
-    {
-        struct ext4_mount_stats s;
-        r = ext4_mount_point_stats(stat_path, &s);
-        if (r == 0)
-        {
-            st->st_blksize = s.block_size;
-            // man say st_blocks is number of 512B blocks allocated
-            st->st_blocks = RT_ALIGN(st->st_size, st->st_blksize) / 512;
-        }
-    }
-
-    return -r;
+    return -ret;
 }
 
 static int dfs_ext_getdents(struct dfs_file *file, struct dirent *dirp, rt_uint32_t count)
 {
     int index;
     struct dirent *d;
+    struct dfs_ext4_file *ext_file;
     const ext4_direntry *rentry;
 
     /* make integer count */
     count = (count / sizeof(struct dirent)) * sizeof(struct dirent);
-    if (count == 0)
+    if (count == 0 || file->data == RT_NULL)
     {
         return -RT_EINVAL;
     }
 
     index = 0;
+    ext_file = (struct dfs_ext4_file*)file->data;
     while (1)
     {
         d = dirp + index;
 
-        rentry = ext4_dir_entry_next(file->data);
-        if (NULL != rentry)
+        rentry = ext4_dir_entry_next(&(ext_file->entry.dir));
+        if (rentry != NULL)
         {
             strncpy(d->d_name, (char *)rentry->name, DFS_PATH_MAX);
-            if (EXT4_DE_DIR == rentry->inode_type)
+            if (rentry->inode_type == EXT4_DE_DIR)
             {
                 d->d_type = DT_DIR;
+            }
+            else if (rentry->inode_type == EXT4_DE_SYMLINK)
+            {
+                d->d_type = DT_SYMLINK;
             }
             else
             {
@@ -547,46 +775,100 @@ static int dfs_ext_getdents(struct dfs_file *file, struct dirent *dirp, rt_uint3
         }
     }
 
-    file->pos += index * sizeof(struct dirent);
+    file->fpos += index * sizeof(struct dirent);
 
     return index * sizeof(struct dirent);
 }
 
-static int dfs_ext_rename(struct dfs_filesystem *fs, const char *oldpath, const char *newpath)
+static int dfs_ext_rename(struct dfs_dentry *old_dentry, struct dfs_dentry *new_dentry)
 {
     int r;
+    char *oldpath, *newpath;
 
-    r = ext4_frename(oldpath, newpath);
+    oldpath = dfs_dentry_full_path(old_dentry);
+    newpath = dfs_dentry_full_path(new_dentry);
+
+    if (oldpath && newpath)
+    {
+        r = ext4_frename(oldpath, newpath);
+    }
+
+    rt_free(oldpath);
+    rt_free(newpath);
 
     return -r;
 }
 
-static const struct dfs_file_ops _ext_fops =
+static int dfs_ext_truncate(struct dfs_file *file, off_t offset)
 {
-    dfs_ext_open,
-    dfs_ext_close,
-    dfs_ext_ioctl,
-    dfs_ext_read,
-    dfs_ext_write,
-    dfs_ext_flush,
-    dfs_ext_lseek,
-    dfs_ext_getdents,
+    return 0;
+}
+
+static int dfs_ext_ioctl(struct dfs_file *fd, int cmd, void *args)
+{
+    int ret = RT_EOK;
+
+    switch (cmd)
+    {
+    case RT_FIOFTRUNCATE:
+        {
+            off_t offset = (off_t)(size_t)(args);
+            ret = dfs_ext_truncate(fd, offset);
+        }
+        break;
+
+    case F_GETLK:
+    case F_SETLK:
+        ret = RT_EOK;
+        break;
+
+    default:
+        ret = -RT_EIO;
+        break;
+    }
+
+    return ret;
+}
+
+static const struct dfs_file_ops _extfs_fops =
+{
+    .open  = dfs_ext_open,
+    .close = dfs_ext_close,
+    .ioctl = dfs_ext_ioctl,
+    .read  = dfs_ext_read,
+    .write = dfs_ext_write,
+    .flush = dfs_ext_flush,
+    .lseek = dfs_ext_lseek,
+    .truncate = dfs_ext_truncate,
+    .getdents = dfs_ext_getdents,
 };
 
-static const struct dfs_filesystem_ops _ext_fs =
+static const struct dfs_filesystem_ops _extfs_ops =
 {
-    "ext",
-    DFS_FS_FLAG_DEFAULT,
-    &_ext_fops,
+    .name   = "ext",
+    .flags  = DFS_FS_FLAG_DEFAULT,
+    .default_fops = &_extfs_fops,
 
-    dfs_ext_mount,
-    dfs_ext_unmount,
-    dfs_ext_mkfs,
-    dfs_ext_statfs, /* statfs */
+    .mount  = dfs_ext_mount,
+    .umount = dfs_ext_unmount,
+    .mkfs   = dfs_ext_mkfs,
+    .statfs = dfs_ext_statfs, /* statfs */
 
-    dfs_ext_unlink,
-    dfs_ext_stat,
-    dfs_ext_rename
+    .readlink   = dfs_ext_readlink,
+    .link       = dfs_ext_link,
+    .unlink     = dfs_ext_unlink,
+    .symlink    = dfs_ext_symlink,
+    .stat       = dfs_ext_stat,
+    .rename     = dfs_ext_rename,
+
+    .lookup     = dfs_ext_lookup,
+    .create_vnode = dfs_ext_create_vnode,
+    .free_vnode   = dfs_ext_free_vnode,
+};
+
+static struct dfs_filesystem_type _extfs =
+{
+    .fs_ops = &_extfs_ops,
 };
 
 int dfs_ext_init(void)
@@ -602,7 +884,7 @@ int dfs_ext_init(void)
     }
 
     /* register rom file system */
-    dfs_register(&_ext_fs);
+    dfs_register(&_extfs);
     return 0;
 }
-INIT_COMPONENT_EXPORT(dfs_ext_init);
+INIT_PREV_EXPORT(dfs_ext_init);
