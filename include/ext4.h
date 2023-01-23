@@ -109,27 +109,6 @@ typedef struct ext4_dir {
 
 /********************************MOUNT OPERATIONS****************************/
 
-/**@brief   Register block device.
- *
- * @param   bd Block device.
- * @param   dev_name Block device name.
- *
- * @return  Standard error code.*/
-int ext4_device_register(struct ext4_blockdev *bd,
-             const char *dev_name);
-
-/**@brief   Un-register block device.
- *
- * @param   dev_name Block device name.
- *
- * @return  Standard error code.*/
-int ext4_device_unregister(const char *dev_name);
-
-/**@brief   Un-register all block devices.
- *
- * @return  Standard error code.*/
-int ext4_device_unregister_all(void);
-
 /**@brief   Mount a block device with EXT4 partition to the mount point.
  *
  * @param   dev_name Block device name (@ref ext4_device_register).
@@ -140,7 +119,7 @@ int ext4_device_unregister_all(void);
  * @param   read_only mount as read-only mode.
  *
  * @return Standard error code */
-int ext4_mount(const char *dev_name,
+int ext4_mount(struct ext4_blockdev *bd,
            const char *mount_point,
            bool read_only);
 

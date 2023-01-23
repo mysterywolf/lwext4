@@ -790,11 +790,11 @@ int ext4_mkfs(struct ext4_fs *fs, struct ext4_blockdev *bd,
     ext4_dbg(DEBUG_MKFS, DBG_NONE "Inodes: %"PRIu32"\n", info->inodes);
     ext4_dbg(DEBUG_MKFS, DBG_NONE "Journal blocks: %"PRIu32"\n",
             info->journal_blocks);
-    ext4_dbg(DEBUG_MKFS, DBG_NONE "Features ro_compat: 0x%x\n",
+    ext4_dbg(DEBUG_MKFS, DBG_NONE "Features ro_compat: 0x%lx\n",
             info->feat_ro_compat);
-    ext4_dbg(DEBUG_MKFS, DBG_NONE "Features compat: 0x%x\n",
+    ext4_dbg(DEBUG_MKFS, DBG_NONE "Features compat: 0x%lx\n",
             info->feat_compat);
-    ext4_dbg(DEBUG_MKFS, DBG_NONE "Features incompat: 0x%x\n",
+    ext4_dbg(DEBUG_MKFS, DBG_NONE "Features incompat: 0x%lx\n",
             info->feat_incompat);
     ext4_dbg(DEBUG_MKFS, DBG_NONE "BG desc reserve: %"PRIu32"\n",
             info->bg_desc_reserve_blocks);
