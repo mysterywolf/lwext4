@@ -35,7 +35,7 @@ CPPDEFINES = ['CONFIG_USE_DEFAULT_CFG', 'CONFIG_HAVE_OWN_OFLAGS=0']
 LOCAL_CCFLAGS = ''
 
 group = DefineGroup('Filesystem', objs, 
-            depend = ['RT_USING_DFS', 'PKG_USING_EXT4'],
+            depend = ['RT_USING_DFS', 'RT_USING_DFS_LWEXT4'],
             CPPPATH = CPPPATH,
             CPPDEFINES = CPPDEFINES,
             LOCAL_CCFLAGS = LOCAL_CCFLAGS)
