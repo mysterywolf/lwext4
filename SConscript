@@ -1,5 +1,4 @@
 from building import *
-import rtconfig
 
 cwd = GetCurrentDir()
 
@@ -27,7 +26,6 @@ src/ext4_xattr.c
 ports/rtthread/dfs_ext.c
 ports/rtthread/dfs_ext_blockdev.c
 ''')
-# src/ext4_mbr.c
 
 CPPPATH = [cwd + '/include', cwd + '/ports/rtthread']
 CPPDEFINES = ['CONFIG_USE_DEFAULT_CFG', 'CONFIG_HAVE_OWN_OFLAGS=0']
