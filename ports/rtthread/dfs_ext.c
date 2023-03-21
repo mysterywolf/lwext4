@@ -400,6 +400,9 @@ static int dfs_ext_stat(struct dfs_filesystem *fs, const char *path, struct stat
     uint32_t mtime;
     uint32_t ctime;
     char *stat_path;
+    struct ext4_inode inode;
+    uint32_t ino = 0;
+    uint32_t dev = 0;
 
     union
     {
@@ -433,6 +436,13 @@ static int dfs_ext_stat(struct dfs_filesystem *fs, const char *path, struct stat
         ext4_atime_get(stat_path, &atime);
         ext4_mtime_get(stat_path, &mtime);
         ext4_ctime_get(stat_path, &ctime);
+
+        if (ext4_raw_inode_fill(stat_path, &ino, &inode) == EOK)
+        {
+            dev = ext4_inode_get_dev(&inode);
+        }
+        st->st_dev = dev;
+        st->st_ino = ino;
         st->st_mode = mode;
         st->st_size = var.dir.f.fsize;
         st->st_uid = uid;
@@ -451,6 +461,12 @@ static int dfs_ext_stat(struct dfs_filesystem *fs, const char *path, struct stat
             ext4_atime_get(stat_path, &atime);
             ext4_mtime_get(stat_path, &mtime);
             ext4_ctime_get(stat_path, &ctime);
+            if (ext4_raw_inode_fill(stat_path, &ino, &inode) == EOK)
+            {
+                dev = ext4_inode_get_dev(&inode);
+            }
+            st->st_dev = dev;
+            st->st_ino = ino;
             st->st_mode = mode;
             st->st_size = ext4_fsize(&(var.f));
             st->st_uid = uid;
