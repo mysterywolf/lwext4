@@ -26,6 +26,7 @@
 #include "ext4_mbr.h"
 #include "ext4_super.h"
 #include "ext4_debug.h"
+#include "ext4_inode.h"
 
 #include "dfs_ext.h"
 #include "dfs_ext_blockdev.h"
