@@ -480,6 +480,15 @@ static int dfs_ext_stat(struct dfs_filesystem *fs, const char *path, struct stat
         }
     }
 
+    struct ext4_mount_stats s;
+    r = ext4_mount_point_stats(stat_path, &s);
+    if (r == 0)
+    {
+        st->st_blksize = s.block_size;
+        // man say st_blocks is number of 512B blocks allocated
+        st->st_blocks = RT_ALIGN(st->st_size, st->st_blksize) / 512;
+    }
+
     return -r;
 }
 
