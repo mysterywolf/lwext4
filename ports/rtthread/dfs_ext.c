@@ -178,6 +178,8 @@ static int dfs_ext_statfs(struct dfs_filesystem *fs, struct statfs *buf)
     buf->f_bsize = ext4_sb_get_block_size(sb);
     buf->f_blocks = ext4_sb_get_blocks_cnt(sb);
     buf->f_bfree = ext4_sb_get_free_blocks_cnt(sb);
+    //TODO this is not accurate, because it is free blocks available to unprivileged user, but ...
+    buf->f_bavail = buf->f_bfree;
     return error;
 
 }
