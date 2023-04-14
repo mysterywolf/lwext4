@@ -64,7 +64,7 @@ static void ext4_unlock(void)
     return ;
 }
 
-rt_inline const char *get_fd_file(struct dfs_fd *fd)
+rt_inline const char *get_fd_file(struct dfs_file *fd)
 {
     const char *fn = NULL;
 
@@ -183,7 +183,7 @@ static int dfs_ext_statfs(struct dfs_filesystem *fs, struct statfs *buf)
     return error;
 
 }
-static int dfs_ext_ioctl(struct dfs_fd *fd, int cmd, void *args)
+static int dfs_ext_ioctl(struct dfs_file *fd, int cmd, void *args)
 {
     int r = RT_EOK;
     switch (cmd)
@@ -216,7 +216,7 @@ static int dfs_ext_ioctl(struct dfs_fd *fd, int cmd, void *args)
     return -RT_EIO;
 }
 
-static int dfs_ext_read(struct dfs_fd *fd, void *buf, size_t count)
+static int dfs_ext_read(struct dfs_file *fd, void *buf, size_t count)
 {
     size_t bytesread = 0;
     ext4_file *file = fd->data;
@@ -235,7 +235,7 @@ static int dfs_ext_read(struct dfs_fd *fd, void *buf, size_t count)
     return bytesread;
 }
 
-static int dfs_ext_write(struct dfs_fd *fd, const void *buf, size_t count)
+static int dfs_ext_write(struct dfs_file *fd, const void *buf, size_t count)
 {
     size_t byteswritten = 0;
     ext4_file *file = fd->data;
@@ -256,7 +256,7 @@ static int dfs_ext_write(struct dfs_fd *fd, const void *buf, size_t count)
     return byteswritten;
 }
 
-static int dfs_ext_flush(struct dfs_fd *fd)
+static int dfs_ext_flush(struct dfs_file *fd)
 {
     int error = RT_EOK;
 
@@ -269,7 +269,7 @@ static int dfs_ext_flush(struct dfs_fd *fd)
     return error;
 }
 
-static int dfs_ext_lseek(struct dfs_fd *fd, off_t offset)
+static int dfs_ext_lseek(struct dfs_file *fd, off_t offset)
 {
     int r;
     ext4_file *file = fd->data;
@@ -283,7 +283,7 @@ static int dfs_ext_lseek(struct dfs_fd *fd, off_t offset)
     return -r;
 }
 
-static int dfs_ext_close(struct dfs_fd *file)
+static int dfs_ext_close(struct dfs_file *file)
 {
     int r;
 
@@ -297,7 +297,7 @@ static int dfs_ext_close(struct dfs_fd *file)
     return -r;
 }
 
-static int dfs_ext_open(struct dfs_fd *file)
+static int dfs_ext_open(struct dfs_file *file)
 {
     int r = EOK;
     ext4_dir *dir;
@@ -497,7 +497,7 @@ static int dfs_ext_stat(struct dfs_filesystem *fs, const char *path, struct stat
     return -r;
 }
 
-static int dfs_ext_getdents(struct dfs_fd *file, struct dirent *dirp, rt_uint32_t count)
+static int dfs_ext_getdents(struct dfs_file *file, struct dirent *dirp, rt_uint32_t count)
 {
     int index;
     struct dirent *d;
