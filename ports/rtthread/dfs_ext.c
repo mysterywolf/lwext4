@@ -129,7 +129,7 @@ static int dfs_ext_unmount(struct dfs_filesystem *fs)
     }
     else
     {
-        rc = -RT_ERROR;
+        rc = -RT_EINVAL;
     }
     return rc;
 }
