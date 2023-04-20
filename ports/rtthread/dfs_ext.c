@@ -152,7 +152,7 @@ static struct dfs_vnode* dfs_ext_lookup(struct dfs_dentry *dentry)
 
                     vnode->nlink = 1;
                     DLOG(msg, "ext", "mnt", DLOG_MSG, "dfs_mnt_ref(dentry->mnt, name=%s)", dentry->mnt->fs_ops->name);
-                    vnode->mnt = dfs_mnt_ref(dentry->mnt);
+                    vnode->mnt = dentry->mnt;
                     vnode->data = (void*) ext_vnode;
 
                     ext4_vnode_update_info(vnode);
@@ -166,6 +166,11 @@ static struct dfs_vnode* dfs_ext_lookup(struct dfs_dentry *dentry)
                 }
             }
             rt_free(fn);
+        }
+
+        if (vnode == RT_NULL)
+        {
+            rt_free(ext_vnode);
         }
     }
 
@@ -226,20 +231,25 @@ static struct dfs_vnode* dfs_ext_create_vnode(struct dfs_dentry *dentry, int typ
                     }
                 }
 
-                vnode->data = ext_vnode;
+                if (ret != EOK)
+                {
+                    rt_free(ext_vnode);
+                    ext_vnode = NULL;
+
+                    dfs_vnode_destroy(vnode);
+                    vnode = NULL;
+                }
+                else
+                {
+                    DLOG(msg, "ext", "mnt", DLOG_MSG, "dfs_mnt_ref(dentry->mnt, name=%s)", dentry->mnt->fs_ops->name);
+                    vnode->mnt = dentry->mnt;
+                    vnode->data = ext_vnode;
+                    vnode->mode = mode;
+                }
             }
 
             rt_free(fn);
             fn = NULL;
-
-            if (ret != EOK)
-            {
-                rt_free(ext_vnode);
-                ext_vnode = NULL;
-
-                dfs_vnode_destroy(vnode);
-                vnode = NULL;
-            }
         }
         else
         {
@@ -273,28 +283,20 @@ static int dfs_ext_free_vnode(struct dfs_vnode* vnode)
     return RT_EOK;
 }
 
-static struct dfs_dentry *dfs_ext_mount(struct dfs_mnt *mnt, unsigned long rwflag, const void *data)
+static int dfs_ext_mount(struct dfs_mnt *mnt, unsigned long rwflag, const void *data)
 {
     int rc = 0;
-    struct dfs_dentry *root = NULL;
     struct ext4_blockdev *bd = NULL;
     struct dfs_ext4_blockdev *dbd = NULL;
 
-    root = dfs_dentry_create("/");
-    DLOG(msg, "ext", "mnt", DLOG_MSG, "dfs_mnt_ref(mnt.name=%s)", mnt->fs_ops->name);
-    root->mnt = dfs_mnt_ref(mnt);
-
     /* create dfs ext4 block device */
-    dbd = dfs_ext4_blockdev_create(root->mnt->dev_id);
+    dbd = dfs_ext4_blockdev_create(mnt->dev_id);
     if (!dbd) return RT_NULL;
 
     bd = &dbd->bd;
     rc = ext4_mount(bd, mnt->fullpath, false);
     if (rc != EOK)
     {
-        dfs_dentry_unref(root);
-        root = NULL;
-
         dfs_ext4_blockdev_destroy(dbd);
         rc = -rc;
     }
@@ -302,39 +304,27 @@ static struct dfs_dentry *dfs_ext_mount(struct dfs_mnt *mnt, unsigned long rwfla
     {
         ext4_mount_setup_locks(mnt->fullpath, &ext4_lock_ops);
         /* set file system data to dbd */
+        dbd->data = bd->journal;
+        bd->journal = 0;
         mnt->data = (void*) dbd;
-
-        DLOG(msg, "ext", "ext", DLOG_MSG, "dfs_ext_lookup(dentry.name=%s)", root->pathname);
-        root->vnode = dfs_ext_lookup(root);
-        if (!root->vnode)
-        {
-            DLOG(msg, "ext", "ext", DLOG_MSG_RET, "lookup failed(dentry.name=%s)", root->pathname);
-            dfs_dentry_unref(root);
-            return RT_NULL;
-        }
     }
 
-    return root;
+    return rc;
 }
 
 static int dfs_ext_unmount(struct dfs_mnt *mnt)
 {
-    int rc;
+    int rc = EPERM;
     struct dfs_ext4_blockdev *dbd = NULL;
 
     dbd = (struct dfs_ext4_blockdev *)mnt->data;
     if (dbd)
     {
-        char *mp = mnt->fullpath; /*mount point */
-
-        /* unref root dentry firstly */
-        dfs_dentry_unref(mnt->root);
-        mnt->root = RT_NULL;
-
-        rc = ext4_umount(mp);
+        rc = ext4_umount_mp(dbd->data);
         if (rc == 0)
         {
             dfs_ext4_blockdev_destroy(dbd);
+            mnt->data = NULL;
         }
     }
 
@@ -394,6 +384,8 @@ static int dfs_ext_statfs(struct dfs_mnt *mnt, struct statfs *buf)
         buf->f_bsize = ext4_sb_get_block_size(sb);
         buf->f_blocks = ext4_sb_get_blocks_cnt(sb);
         buf->f_bfree = ext4_sb_get_free_blocks_cnt(sb);
+        //TODO this is not accurate, because it is free blocks available to unprivileged user, but ...
+        buf->f_bavail = buf->f_bfree;
     }
 
     return error;
@@ -471,17 +463,28 @@ static int dfs_ext_flush(struct dfs_file *fd)
 
 static int dfs_ext_lseek(struct dfs_file *fd, off_t offset, int whence)
 {
-    int r;
+    int r = EPERM;
     struct dfs_ext4_file *ext_file;
 
     if (fd && fd->data)
     {
         ext_file = (struct dfs_ext4_file *)fd->data;
 
-        r = ext4_fseek(&(ext_file->entry.file), (int64_t)offset, whence);
-        if (r == RT_EOK)
+        if (ext_file->type == FT_DIRECTORY)
         {
-            return ext_file->entry.file.fpos;
+            if (offset == 0)
+            {
+                ext4_dir_entry_rewind(&(ext_file->entry.dir));
+                return 0;
+            }
+        }
+        else
+        {
+            r = ext4_fseek(&(ext_file->entry.file), (int64_t)offset, whence);
+            if (r == RT_EOK)
+            {
+                return ext_file->entry.file.fpos;
+            }
         }
     }
 
@@ -532,11 +535,9 @@ static int dfs_ext_open(struct dfs_file *file)
             ext_file = (struct dfs_ext4_file *) rt_malloc(sizeof(struct dfs_ext4_file));
             if (ext_file)
             {
-                int oflags;
                 char *fn = NULL;
 
                 ext_file->type = file->vnode->type;
-                oflags = dfs_oflags(file->flags);
 
                 fn = dfs_dentry_full_path(file->dentry);
                 if (fn)
@@ -553,7 +554,7 @@ static int dfs_ext_open(struct dfs_file *file)
                     else
                     {
                         /* open regular file */
-                        ret = ext4_fopen2(&ext_file->entry.file, fn, oflags);
+                        ret = ext4_fopen2(&ext_file->entry.file, fn, file->flags);
                         if (ret == EOK)
                         {
                             file->fpos = ext_file->entry.file.fpos;
@@ -595,12 +596,12 @@ static int dfs_ext_readlink(struct dfs_dentry *dentry, char *buf, int len)
         {
             size_t size;
             ret = ext4_readlink(fn, buf, len, &size);
+            rt_free(fn);
             if (ret == EOK)
             {
                 buf[size] = '\0';
+                return size;
             }
-
-            rt_free(fn);
         }
         else
         {
@@ -668,7 +669,7 @@ static int dfs_ext_symlink(struct dfs_dentry *parent_dentry, const char *target,
 
 static int dfs_ext_unlink(struct dfs_dentry *dentry)
 {
-    int ret;
+    int ret = EPERM;
     char *fn = NULL;
     struct dfs_ext4_file file;
 
@@ -713,6 +714,13 @@ static int dfs_ext_stat(struct dfs_dentry *dentry, struct stat *st)
             st->st_mtime = ext4_inode_get_modif_time(inode_ref.inode);
             st->st_ctime = ext4_inode_get_change_inode_time(inode_ref.inode);
 
+            st->st_dev = (dev_t)(dentry->mnt->dev_id);
+            st->st_ino = inode_ref.index;
+
+            st->st_blksize = ext4_sb_get_block_size(&mp->fs.sb);
+            // man say st_blocks is number of 512B blocks allocated
+            st->st_blocks = RT_ALIGN(st->st_size, st->st_blksize) / 512;
+
             ext4_put_inode_ref(mp, &inode_ref);
         }
         else
@@ -724,6 +732,25 @@ static int dfs_ext_stat(struct dfs_dentry *dentry, struct stat *st)
     }
 
     return -ret;
+}
+
+int dfs_ext_setattr(struct dfs_dentry *dentry, struct dfs_attr *attr)
+{
+    int ret = 0;
+    char *fn = NULL;
+
+    fn = dfs_dentry_full_path(dentry);
+    if (fn) 
+    {
+	    ret = ext4_mode_set(fn, attr->st_mode);
+	    rt_free(fn);
+    }
+    else
+    {
+	    ret = ENOENT;
+    }
+
+    return ret;
 }
 
 static int dfs_ext_getdents(struct dfs_file *file, struct dirent *dirp, rt_uint32_t count)
@@ -782,7 +809,7 @@ static int dfs_ext_getdents(struct dfs_file *file, struct dirent *dirp, rt_uint3
 
 static int dfs_ext_rename(struct dfs_dentry *old_dentry, struct dfs_dentry *new_dentry)
 {
-    int r;
+    int r = EPERM;
     char *oldpath, *newpath;
 
     oldpath = dfs_dentry_full_path(old_dentry);
@@ -846,7 +873,7 @@ static const struct dfs_file_ops _extfs_fops =
 static const struct dfs_filesystem_ops _extfs_ops =
 {
     .name   = "ext",
-    .flags  = DFS_FS_FLAG_DEFAULT,
+    .flags  = FS_NEED_DEVICE,
     .default_fops = &_extfs_fops,
 
     .mount  = dfs_ext_mount,
@@ -859,6 +886,7 @@ static const struct dfs_filesystem_ops _extfs_ops =
     .unlink     = dfs_ext_unlink,
     .symlink    = dfs_ext_symlink,
     .stat       = dfs_ext_stat,
+    .setattr    = dfs_ext_setattr,
     .rename     = dfs_ext_rename,
 
     .lookup     = dfs_ext_lookup,
@@ -887,4 +915,4 @@ int dfs_ext_init(void)
     dfs_register(&_extfs);
     return 0;
 }
-INIT_PREV_EXPORT(dfs_ext_init);
+INIT_COMPONENT_EXPORT(dfs_ext_init);

@@ -130,6 +130,13 @@ int ext4_mount(struct ext4_blockdev *bd,
  * @param   mount_point Mount point.
  *
  * @return  Standard error code */
+int ext4_umount_mp(struct ext4_mountpoint *mp);
+
+/**@brief   Umount operation.
+ *
+ * @param   mount_pount Mount point.
+ *
+ * @return  Standard error code */
 int ext4_umount(const char *mount_point);
 
 /**@brief   Starts journaling. Journaling start/stop functions are transparent

@@ -18,6 +18,7 @@ struct dfs_ext4_blockdev
     rt_device_t devid;
     struct ext4_blockdev bd;
     uint8_t ph_bbuf[4096];
+    void *data;
 };
 
 struct ext4_blockdev *ext4_blockdev_from_devid(struct rt_device *devid);

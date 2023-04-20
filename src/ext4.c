@@ -285,8 +285,8 @@ int ext4_mount(struct ext4_blockdev *bd, const char *mount_point,
             break;
         }
 
-        if (!strcmp(s_mp[i].name, mount_point))
-            return EOK;
+        /*if (!strcmp(s_mp[i].name, mount_point))
+            return EOK;*/
     }
 
     if (!mp)
@@ -326,7 +326,32 @@ int ext4_mount(struct ext4_blockdev *bd, const char *mount_point,
 
     bd->fs = &mp->fs;
     mp->mounted = 1;
+    bd->journal = (void *)mp;
     return r;
+}
+
+int ext4_umount_mp(struct ext4_mountpoint *mp)
+{
+    int ret = ENODEV;
+
+    if (mp && mp->mounted)
+    {
+        ret = ext4_fs_fini(&mp->fs);
+        if (ret == EOK)
+        {
+            mp->mounted = 0;
+
+            ext4_bcache_cleanup(mp->fs.bdev->bc);
+            ext4_bcache_fini_dynamic(mp->fs.bdev->bc);
+
+            ret = ext4_block_fini(mp->fs.bdev);
+        }
+
+        mp->fs.bdev->fs = NULL;
+        memset(mp, 0, sizeof(struct ext4_mountpoint));
+    }
+
+    return ret;
 }
 
 int ext4_umount(const char *mount_point)
@@ -345,19 +370,8 @@ int ext4_umount(const char *mount_point)
     if (!mp)
         return ENODEV;
 
-    r = ext4_fs_fini(&mp->fs);
-    if (r != EOK)
-        goto Finish;
+    r = ext4_umount_mp(mp);
 
-    mp->mounted = 0;
-
-    ext4_bcache_cleanup(mp->fs.bdev->bc);
-    ext4_bcache_fini_dynamic(mp->fs.bdev->bc);
-
-    r = ext4_block_fini(mp->fs.bdev);
-Finish:
-    mp->fs.bdev->fs = NULL;
-    memset(mp, 0, sizeof(struct ext4_mountpoint));
     return r;
 }
 
@@ -852,14 +866,16 @@ static int ext4_generic_open2(ext4_file *f, const char *path, int flags,
     f->flags = flags;
 
     /*Skip mount point*/
-    path += strlen(mp->name);
+    len = strlen(mp->name);
+    path += len;
     if (path[0] == '/')
     {
         path += 1;
+        len += 1;
     }
 
     if (name_off)
-        *name_off = strlen(mp->name);
+        *name_off = len;
 
     /*Load root*/
     r = ext4_fs_get_inode_ref(fs, EXT4_INODE_ROOT_INDEX, &ref);
