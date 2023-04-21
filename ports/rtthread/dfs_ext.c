@@ -109,7 +109,7 @@ static int dfs_ext_mount(struct dfs_filesystem *fs, unsigned long rwflag, const 
 
 static int dfs_ext_unmount(struct dfs_filesystem *fs)
 {
-    int rc;
+    int rc = -RT_ERROR;
     struct dfs_ext4_blockdev *dbd = NULL;
 
     dbd = (struct dfs_ext4_blockdev *)fs->data;
