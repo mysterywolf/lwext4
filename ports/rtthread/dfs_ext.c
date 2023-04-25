@@ -444,7 +444,7 @@ static int dfs_ext_stat(struct dfs_filesystem *fs, const char *path, struct stat
         {
             dev = ext4_inode_get_dev(&inode);
         }
-        st->st_dev = dev;
+        st->st_dev = (dev_t)(fs->dev_id);
         st->st_ino = ino;
         st->st_mode = mode;
         st->st_size = var.dir.f.fsize;
@@ -468,7 +468,7 @@ static int dfs_ext_stat(struct dfs_filesystem *fs, const char *path, struct stat
             {
                 dev = ext4_inode_get_dev(&inode);
             }
-            st->st_dev = dev;
+            st->st_dev = (dev_t)(fs->dev_id);
             st->st_ino = ino;
             st->st_mode = mode;
             st->st_size = ext4_fsize(&(var.f));
