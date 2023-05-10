@@ -122,8 +122,15 @@ static int dfs_ext_unmount(struct dfs_filesystem *fs)
         {
             dfs_ext4_blockdev_destroy(dbd);
         }
+        else
+        {
+            rc = -rc;
+        }
     }
-
+    else
+    {
+        rc = -RT_EINVAL;
+    }
     return rc;
 }
 
