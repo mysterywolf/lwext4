@@ -393,7 +393,7 @@ static int dfs_ext_statfs(struct dfs_mnt *mnt, struct statfs *buf)
 
 /* file ops */
 
-static int dfs_ext_read(struct dfs_file *fd, void *buf, size_t count, off_t *pos)
+static ssize_t dfs_ext_read(struct dfs_file *fd, void *buf, size_t count, off_t *pos)
 {
     int r;
     size_t bytesread = 0;
@@ -414,7 +414,7 @@ static int dfs_ext_read(struct dfs_file *fd, void *buf, size_t count, off_t *pos
     return bytesread;
 }
 
-static int dfs_ext_write(struct dfs_file *fd, const void *buf, size_t count, off_t *pos)
+static ssize_t dfs_ext_write(struct dfs_file *fd, const void *buf, size_t count, off_t *pos)
 {
     int r;
     size_t byteswritten = 0;
@@ -461,7 +461,7 @@ static int dfs_ext_flush(struct dfs_file *fd)
     return error;
 }
 
-static int dfs_ext_lseek(struct dfs_file *fd, off_t offset, int whence)
+static off_t dfs_ext_lseek(struct dfs_file *fd, off_t offset, int whence)
 {
     int r = EPERM;
     struct dfs_ext4_file *ext_file;
@@ -740,7 +740,7 @@ int dfs_ext_setattr(struct dfs_dentry *dentry, struct dfs_attr *attr)
     char *fn = NULL;
 
     fn = dfs_dentry_full_path(dentry);
-    if (fn) 
+    if (fn)
     {
 	    ret = ext4_mode_set(fn, attr->st_mode);
 	    rt_free(fn);
