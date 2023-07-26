@@ -1800,6 +1800,11 @@ int ext4_fwrite(ext4_file *file, const void *buf, size_t size, size_t *wcnt)
 
     /*Sync file size*/
     file->fsize = ext4_inode_get_size(sb, ref.inode);
+    if (file->fpos > file->fsize) {
+        file->fsize = file->fpos;
+        ext4_inode_set_size(ref.inode, file->fsize);
+        ref.dirty = true;
+    }
     block_size = ext4_sb_get_block_size(sb);
 
     iblock_last = (uint32_t)((file->fpos + size) / block_size);
