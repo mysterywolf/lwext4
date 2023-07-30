@@ -35,7 +35,7 @@
 #include "dfs_ext.h"
 #include "dfs_ext_blockdev.h"
 
-#include "dfs_page_cache.h"
+#include "dfs_pcache.h"
 
 #ifdef PKG_USING_DLOG
 #include <dlog.h>
@@ -152,11 +152,7 @@ static struct dfs_vnode* dfs_ext_lookup(struct dfs_dentry *dentry)
                         vnode->type = FT_REGULAR;
                         vnode->size = ext4_inode_get_size(&(ext_file->vnode.mp->fs.sb), ext_file->vnode.inode_ref.inode);
 #ifdef RT_USING_DFS_CACHE
-                        vnode->aspace = dfs_aspace_create(vnode, &dfs_ext_aspace_ops);
-                        if (vnode->aspace)
-                        {
-                            vnode->aspace->dentry = dentry;
-                        }
+                        vnode->aspace = dfs_aspace_create(dentry, vnode, &dfs_ext_aspace_ops);
 #endif
                         break;
                     case EXT4_INODE_MODE_DIRECTORY:
@@ -173,6 +169,7 @@ static struct dfs_vnode* dfs_ext_lookup(struct dfs_dentry *dentry)
                     DLOG(msg, "ext", "mnt", DLOG_MSG, "dfs_mnt_ref(dentry->mnt, name=%s)", dentry->mnt->fs_ops->name);
                     vnode->mnt = dentry->mnt;
                     vnode->data = (void*) ext_file;
+                    ext_file->type = EXT4_DE_UNKNOWN;
 
                     ext4_vnode_update_info(vnode);
                 }
@@ -248,11 +245,7 @@ static struct dfs_vnode* dfs_ext_create_vnode(struct dfs_dentry *dentry, int typ
                             vnode->size = ext4_inode_get_size(&(ext_file->vnode.mp->fs.sb), ext_file->vnode.inode_ref.inode);
                         }
 #ifdef RT_USING_DFS_CACHE
-                        vnode->aspace = dfs_aspace_create(vnode, &dfs_ext_aspace_ops);
-                        if (vnode->aspace)
-                        {
-                            vnode->aspace->dentry = dentry;
-                        }
+                        vnode->aspace = dfs_aspace_create(dentry, vnode, &dfs_ext_aspace_ops);
 #endif
                     }
                 }
@@ -271,6 +264,7 @@ static struct dfs_vnode* dfs_ext_create_vnode(struct dfs_dentry *dentry, int typ
                     vnode->mnt = dentry->mnt;
                     vnode->data = (void *) ext_file;
                     vnode->mode = mode;
+                    ext_file->type = EXT4_DE_UNKNOWN;
                 }
             }
 
@@ -422,10 +416,15 @@ static ssize_t dfs_ext_read(struct dfs_file *file, void *buf, size_t count, off_
 
     if (file && file->data && file->vnode->size > *pos)
     {
+        uint32_t flags;
+
         ext_file = (struct dfs_ext4_file *) file->data;
 
         dfs_ext_lseek(file, *pos, SEEK_SET);
+        flags = ext_file->entry.file.flags;
+        ext_file->entry.file.flags = O_RDWR;
         r = ext4_fread(&ext_file->entry.file, buf, count, &bytesread);
+        ext_file->entry.file.flags = flags;
         if (r != 0)
         {
             bytesread = 0;
@@ -493,7 +492,7 @@ static off_t dfs_ext_lseek(struct dfs_file *file, off_t offset, int whence)
     {
         ext_file = (struct dfs_ext4_file *)file->data;
 
-        if (ext_file->type == FT_DIRECTORY)
+        if (ext_file->type == EXT4_DE_DIR)
         {
             if (offset == 0)
             {
@@ -501,7 +500,7 @@ static off_t dfs_ext_lseek(struct dfs_file *file, off_t offset, int whence)
                 return 0;
             }
         }
-        else
+        else if (ext_file->type == EXT4_DE_REG_FILE)
         {
             r = ext4_fseek(&(ext_file->entry.file), (int64_t)offset, whence);
             if (r == RT_EOK)
@@ -521,20 +520,26 @@ static int dfs_ext_close(struct dfs_file *file)
 
     if (file)
     {
+        RT_ASSERT(file->vnode->ref_count > 0);
+        if (file->vnode->ref_count > 1)
+        {
+            return ret;
+        }
         ext_file = (struct dfs_ext4_file *) file->data;
         if (ext_file)
         {
-            if (ext_file->type == FT_DIRECTORY)
+            if (ext_file->type == EXT4_DE_DIR)
             {
                 ret = ext4_dir_close(&ext_file->entry.dir);
             }
-            else if (ext_file->type == FT_REGULAR)
+            else if (ext_file->type == EXT4_DE_REG_FILE)
             {
                 ret = ext4_fclose(&ext_file->entry.file);
             }
 
             if (ret == EOK)
             {
+                ext_file->type = EXT4_DE_UNKNOWN;
                 file->data = NULL;
             }
         }
@@ -551,11 +556,22 @@ static int dfs_ext_open(struct dfs_file *file)
     if (file && file->vnode)
     {
         ext_file = (struct dfs_ext4_file *)file->vnode->data;
+
+        RT_ASSERT(file->vnode->ref_count > 0);
+        if (ext_file && ext_file->type != EXT4_DE_UNKNOWN)
+        {
+            if (file->vnode->type == FT_DIRECTORY
+                && !(file->flags & O_DIRECTORY))
+            {
+                return -ENOENT;
+            }
+            file->fpos = 0;
+            return ret;
+        }
+
         if (ext_file)
         {
                 char *fn = NULL;
-
-                ext_file->type = file->vnode->type;
 
                 fn = dfs_dentry_full_path(file->dentry);
                 if (fn)
@@ -566,6 +582,7 @@ static int dfs_ext_open(struct dfs_file *file)
                         ret = ext4_dir_open(&ext_file->entry.dir, fn);
                         if (ret == EOK)
                         {
+                            ext_file->type = EXT4_DE_DIR;
                             file->fpos = 0;
                         }
                     }
@@ -575,7 +592,11 @@ static int dfs_ext_open(struct dfs_file *file)
                         ret = ext4_fopen2(&ext_file->entry.file, fn, file->flags);
                         if (ret == EOK)
                         {
-                            file->vnode->size = ext4_fsize(&(ext_file->entry.file));
+                            ext_file->type = EXT4_DE_REG_FILE;
+                            if (file->flags & O_TRUNC)
+                            {
+                                file->vnode->size = 0;
+                            }
                             file->fpos = ext_file->entry.file.fpos;
                         }
                     }
@@ -756,6 +777,7 @@ int dfs_ext_setattr(struct dfs_dentry *dentry, struct dfs_attr *attr)
     if (fn)
     {
         ret = ext4_mode_set(fn, attr->st_mode);
+        ext4_vnode_update_info(dentry->vnode);
         rt_free(fn);
     }
     else
