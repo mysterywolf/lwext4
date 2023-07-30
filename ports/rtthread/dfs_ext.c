@@ -52,7 +52,8 @@ struct dfs_ext4_vnode
 struct dfs_ext4_file
 {
     uint32_t type;  /* EXT4_DE_DIR or EXT4_DE_REG_FILE */
-    union {
+    union
+    {
         ext4_file file;
         ext4_dir dir;
     } entry;
@@ -83,13 +84,13 @@ static void ext4_lock(void)
     {
         RT_ASSERT(0);
     }
-    return ;
+    return;
 }
 
 static void ext4_unlock(void)
 {
     rt_mutex_release(ext4_mutex);
-    return ;
+    return;
 }
 
 static off_t dfs_ext_lseek(struct dfs_file *file, off_t offset, int whence);
@@ -125,13 +126,13 @@ rt_inline int ext4_vnode_update_info(struct dfs_vnode *vnode)
 
 /* file system ops */
 
-static struct dfs_vnode* dfs_ext_lookup(struct dfs_dentry *dentry)
+static struct dfs_vnode *dfs_ext_lookup(struct dfs_dentry *dentry)
 {
     char *fn = RT_NULL;
     struct dfs_vnode *vnode = RT_NULL;
     struct dfs_ext4_file *ext_file = RT_NULL;
 
-    ext_file = (struct dfs_ext4_file *) rt_calloc (1, sizeof(struct dfs_ext4_file));
+    ext_file = (struct dfs_ext4_file *)rt_calloc(1, sizeof(struct dfs_ext4_file));
     if (ext_file)
     {
         fn = dfs_dentry_full_path(dentry);
@@ -168,8 +169,9 @@ static struct dfs_vnode* dfs_ext_lookup(struct dfs_dentry *dentry)
                     vnode->nlink = 1;
                     DLOG(msg, "ext", "mnt", DLOG_MSG, "dfs_mnt_ref(dentry->mnt, name=%s)", dentry->mnt->fs_ops->name);
                     vnode->mnt = dentry->mnt;
-                    vnode->data = (void*) ext_file;
+                    vnode->data = (void *)ext_file;
                     ext_file->type = EXT4_DE_UNKNOWN;
+                    rt_mutex_init(&vnode->lock, dentry->pathname, RT_IPC_FLAG_PRIO);
 
                     ext4_vnode_update_info(vnode);
                 }
@@ -193,7 +195,7 @@ static struct dfs_vnode* dfs_ext_lookup(struct dfs_dentry *dentry)
     return vnode;
 }
 
-static struct dfs_vnode* dfs_ext_create_vnode(struct dfs_dentry *dentry, int type, mode_t mode)
+static struct dfs_vnode *dfs_ext_create_vnode(struct dfs_dentry *dentry, int type, mode_t mode)
 {
     int ret = 0;
     char *fn = NULL;
@@ -206,7 +208,7 @@ static struct dfs_vnode* dfs_ext_create_vnode(struct dfs_dentry *dentry, int typ
         fn = dfs_dentry_full_path(dentry);
         if (fn)
         {
-            ext_file = (struct dfs_ext4_file *) rt_malloc (sizeof(struct dfs_ext4_file));
+            ext_file = (struct dfs_ext4_file *)rt_calloc(1, sizeof(struct dfs_ext4_file));
             if (ext_file)
             {
                 if (type == FT_DIRECTORY)
@@ -262,9 +264,10 @@ static struct dfs_vnode* dfs_ext_create_vnode(struct dfs_dentry *dentry, int typ
                 {
                     DLOG(msg, "ext", "mnt", DLOG_MSG, "dfs_mnt_ref(dentry->mnt, name=%s)", dentry->mnt->fs_ops->name);
                     vnode->mnt = dentry->mnt;
-                    vnode->data = (void *) ext_file;
+                    vnode->data = (void *)ext_file;
                     vnode->mode = mode;
                     ext_file->type = EXT4_DE_UNKNOWN;
+                    rt_mutex_init(&vnode->lock, dentry->pathname, RT_IPC_FLAG_PRIO);
                 }
             }
 
@@ -281,7 +284,7 @@ static struct dfs_vnode* dfs_ext_create_vnode(struct dfs_dentry *dentry, int typ
     return vnode;
 }
 
-static int dfs_ext_free_vnode(struct dfs_vnode* vnode)
+static int dfs_ext_free_vnode(struct dfs_vnode *vnode)
 {
     if (vnode)
     {
@@ -289,7 +292,7 @@ static int dfs_ext_free_vnode(struct dfs_vnode* vnode)
         if (ext_file)
         {
             ext4_put_inode_ref(ext_file->vnode.mp, &(ext_file->vnode.inode_ref));
-
+            rt_mutex_detach(&vnode->lock);
             rt_free(ext_file);
             vnode->data = RT_NULL;
         }
@@ -321,7 +324,7 @@ static int dfs_ext_mount(struct dfs_mnt *mnt, unsigned long rwflag, const void *
         /* set file system data to dbd */
         dbd->data = bd->journal;
         bd->journal = 0;
-        mnt->data = (void*) dbd;
+        mnt->data = (void *)dbd;
     }
 
     return rc;
@@ -416,20 +419,16 @@ static ssize_t dfs_ext_read(struct dfs_file *file, void *buf, size_t count, off_
 
     if (file && file->data && file->vnode->size > *pos)
     {
-        uint32_t flags;
-
-        ext_file = (struct dfs_ext4_file *) file->data;
-
+        ext_file = (struct dfs_ext4_file *)file->data;
+        rt_mutex_take(&file->vnode->lock, RT_WAITING_FOREVER);
         dfs_ext_lseek(file, *pos, SEEK_SET);
-        flags = ext_file->entry.file.flags;
-        ext_file->entry.file.flags = O_RDWR;
         r = ext4_fread(&ext_file->entry.file, buf, count, &bytesread);
-        ext_file->entry.file.flags = flags;
         if (r != 0)
         {
             bytesread = 0;
         }
         *pos = ext_file->entry.file.fpos;
+        rt_mutex_release(&file->vnode->lock);
     }
 
     return bytesread;
@@ -443,8 +442,8 @@ static ssize_t dfs_ext_write(struct dfs_file *file, const void *buf, size_t coun
 
     if (file && file->data)
     {
-        ext_file = (struct dfs_ext4_file *) file->data;
-
+        ext_file = (struct dfs_ext4_file *)file->data;
+        rt_mutex_take(&file->vnode->lock, RT_WAITING_FOREVER);
         dfs_ext_lseek(file, *pos, SEEK_SET);
         r = ext4_fwrite(&(ext_file->entry.file), buf, count, &byteswritten);
         if (r != 0)
@@ -454,6 +453,7 @@ static ssize_t dfs_ext_write(struct dfs_file *file, const void *buf, size_t coun
 
         file->vnode->size = ext4_fsize(&(ext_file->entry.file));
         *pos = ext_file->entry.file.fpos;
+        rt_mutex_release(&file->vnode->lock);
     }
 
     return byteswritten;
@@ -485,32 +485,33 @@ static int dfs_ext_flush(struct dfs_file *file)
 
 static off_t dfs_ext_lseek(struct dfs_file *file, off_t offset, int whence)
 {
-    int r = EPERM;
+    off_t ret = -EPERM;
     struct dfs_ext4_file *ext_file;
 
     if (file && file->data)
     {
         ext_file = (struct dfs_ext4_file *)file->data;
-
+        rt_mutex_take(&file->vnode->lock, RT_WAITING_FOREVER);
         if (ext_file->type == EXT4_DE_DIR)
         {
             if (offset == 0)
             {
                 ext4_dir_entry_rewind(&(ext_file->entry.dir));
-                return 0;
+                ret = 0;
             }
         }
         else if (ext_file->type == EXT4_DE_REG_FILE)
         {
-            r = ext4_fseek(&(ext_file->entry.file), (int64_t)offset, whence);
-            if (r == RT_EOK)
+            ret = ext4_fseek(&(ext_file->entry.file), (int64_t)offset, whence);
+            if (ret == RT_EOK)
             {
-                return ext_file->entry.file.fpos;
+                ret = ext_file->entry.file.fpos;
             }
         }
+        rt_mutex_release(&file->vnode->lock);
     }
 
-    return -r;
+    return ret;
 }
 
 static int dfs_ext_close(struct dfs_file *file)
@@ -525,7 +526,7 @@ static int dfs_ext_close(struct dfs_file *file)
         {
             return ret;
         }
-        ext_file = (struct dfs_ext4_file *) file->data;
+        ext_file = (struct dfs_ext4_file *)file->data;
         if (ext_file)
         {
             if (ext_file->type == EXT4_DE_DIR)
@@ -565,49 +566,50 @@ static int dfs_ext_open(struct dfs_file *file)
             {
                 return -ENOENT;
             }
+            file->data = ext_file;
             file->fpos = 0;
             return ret;
         }
 
         if (ext_file)
         {
-                char *fn = NULL;
+            char *fn = NULL;
 
-                fn = dfs_dentry_full_path(file->dentry);
-                if (fn)
+            fn = dfs_dentry_full_path(file->dentry);
+            if (fn)
+            {
+                if (file->vnode->type == FT_DIRECTORY)
                 {
-                    if (file->vnode->type == FT_DIRECTORY)
-                    {
-                        /* open dir */
-                        ret = ext4_dir_open(&ext_file->entry.dir, fn);
-                        if (ret == EOK)
-                        {
-                            ext_file->type = EXT4_DE_DIR;
-                            file->fpos = 0;
-                        }
-                    }
-                    else
-                    {
-                        /* open regular file */
-                        ret = ext4_fopen2(&ext_file->entry.file, fn, file->flags);
-                        if (ret == EOK)
-                        {
-                            ext_file->type = EXT4_DE_REG_FILE;
-                            if (file->flags & O_TRUNC)
-                            {
-                                file->vnode->size = 0;
-                            }
-                            file->fpos = ext_file->entry.file.fpos;
-                        }
-                    }
-
+                    /* open dir */
+                    ret = ext4_dir_open(&ext_file->entry.dir, fn);
                     if (ret == EOK)
                     {
-                        file->data = ext_file;
+                        ext_file->type = EXT4_DE_DIR;
+                        file->fpos = 0;
                     }
-
-                    rt_free(fn);
                 }
+                else
+                {
+                    /* open regular file */
+                    ret = ext4_fopen2(&ext_file->entry.file, fn, file->flags);
+                    if (ret == EOK)
+                    {
+                        ext_file->type = EXT4_DE_REG_FILE;
+                        if (file->flags & O_TRUNC)
+                        {
+                            file->vnode->size = 0;
+                        }
+                        file->fpos = ext_file->entry.file.fpos;
+                    }
+                }
+
+                if (ret == EOK)
+                {
+                    file->data = ext_file;
+                }
+
+                rt_free(fn);
+            }
         }
     }
     else
@@ -684,7 +686,7 @@ static int dfs_ext_symlink(struct dfs_dentry *parent_dentry, const char *target,
     }
     else
     {
-        fn = (char*) linkpath;
+        fn = (char *)linkpath;
     }
 
     if (fn)
@@ -713,7 +715,7 @@ static int dfs_ext_unlink(struct dfs_dentry *dentry)
         ret = ext4_dir_open(&(file.entry.dir), fn);
         if (ret == 0)
         {
-            (void) ext4_dir_close(&(file.entry.dir));
+            ext4_dir_close(&(file.entry.dir));
             ret = ext4_dir_rm(fn);
         }
         else
@@ -803,7 +805,7 @@ static int dfs_ext_getdents(struct dfs_file *file, struct dirent *dirp, rt_uint3
     }
 
     index = 0;
-    ext_file = (struct dfs_ext4_file*)file->data;
+    ext_file = (struct dfs_ext4_file *)file->data;
     while (1)
     {
         d = dirp + index;
@@ -873,11 +875,11 @@ static int dfs_ext_ioctl(struct dfs_file *file, int cmd, void *args)
     switch (cmd)
     {
     case RT_FIOFTRUNCATE:
-        {
-            off_t offset = (off_t)(size_t)(args);
-            ret = dfs_ext_truncate(file, offset);
-        }
-        break;
+    {
+        off_t offset = (off_t)(size_t)(args);
+        ret = dfs_ext_truncate(file, offset);
+    }
+    break;
 
     case F_GETLK:
     case F_SETLK:
@@ -899,8 +901,20 @@ static ssize_t dfs_ext_page_read(struct dfs_file *file, struct dfs_page *page)
 
     if (page->page)
     {
+        uint32_t flags;
         off_t fpos = page->fpos;
-        ret = dfs_ext_read(file, page->page, page->size, &fpos);
+
+        if (file && file->data)
+        {
+            struct dfs_ext4_file *ext_file = (struct dfs_ext4_file *)file->data;
+
+            rt_mutex_take(&file->vnode->lock, RT_WAITING_FOREVER);
+            flags = ext_file->entry.file.flags;
+            ext_file->entry.file.flags = O_RDWR;
+            ret = dfs_ext_read(file, page->page, page->size, &fpos);
+            ext_file->entry.file.flags = flags;
+            rt_mutex_release(&file->vnode->lock);
+        }
     }
 
     return ret;
@@ -912,16 +926,17 @@ static ssize_t dfs_ext_page_write(struct dfs_page *page)
     size_t byteswritten = 0;
     struct dfs_ext4_file *ext_file;
 
-    if (page && page->vnode && page->vnode->data)
+    if (page && page->aspace->vnode && page->aspace->vnode->data)
     {
-        ext_file = (struct dfs_ext4_file *)page->vnode->data;
-
+        ext_file = (struct dfs_ext4_file *)page->aspace->vnode->data;
+        rt_mutex_take(&page->aspace->vnode->lock, RT_WAITING_FOREVER);
         ext4_fseek(&(ext_file->entry.file), (int64_t)page->fpos, SEEK_SET);
         r = ext4_fwrite(&(ext_file->entry.file), page->page, page->len, &byteswritten);
         if (r != 0)
         {
             byteswritten = 0;
         }
+        rt_mutex_release(&page->aspace->vnode->lock);
     }
 
     return byteswritten;
@@ -930,22 +945,22 @@ static ssize_t dfs_ext_page_write(struct dfs_page *page)
 
 static const struct dfs_file_ops _extfs_fops =
 {
-    .open  = dfs_ext_open,
-    .close = dfs_ext_close,
-    .ioctl = dfs_ext_ioctl,
-    .read  = dfs_ext_read,
-    .write = dfs_ext_write,
-    .flush = dfs_ext_flush,
-    .lseek = dfs_ext_lseek,
-    .truncate = dfs_ext_truncate,
-    .getdents = dfs_ext_getdents,
+    .open       = dfs_ext_open,
+    .close      = dfs_ext_close,
+    .ioctl      = dfs_ext_ioctl,
+    .read       = dfs_ext_read,
+    .write      = dfs_ext_write,
+    .flush      = dfs_ext_flush,
+    .lseek      = dfs_ext_lseek,
+    .truncate   = dfs_ext_truncate,
+    .getdents   = dfs_ext_getdents,
 };
 
 static const struct dfs_filesystem_ops _extfs_ops =
 {
-    .name   = "ext",
-    .flags  = FS_NEED_DEVICE,
-    .default_fops = &_extfs_fops,
+    .name           = "ext",
+    .flags          = FS_NEED_DEVICE,
+    .default_fops   = &_extfs_fops,
 
     .mount  = dfs_ext_mount,
     .umount = dfs_ext_unmount,
@@ -960,9 +975,9 @@ static const struct dfs_filesystem_ops _extfs_ops =
     .setattr    = dfs_ext_setattr,
     .rename     = dfs_ext_rename,
 
-    .lookup     = dfs_ext_lookup,
-    .create_vnode = dfs_ext_create_vnode,
-    .free_vnode   = dfs_ext_free_vnode,
+    .lookup         = dfs_ext_lookup,
+    .create_vnode   = dfs_ext_create_vnode,
+    .free_vnode     = dfs_ext_free_vnode,
 };
 
 static struct dfs_filesystem_type _extfs =
