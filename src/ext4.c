@@ -327,6 +327,9 @@ int ext4_mount(struct ext4_blockdev *bd, const char *mount_point,
     bd->fs = &mp->fs;
     mp->mounted = 1;
     bd->journal = (void *)mp;
+
+    ext4_cache_write_back(mp->name, true);
+
     return r;
 }
 
@@ -336,6 +339,8 @@ int ext4_umount_mp(struct ext4_mountpoint *mp)
 
     if (mp && mp->mounted)
     {
+        ext4_cache_write_back(mp->name, false);
+
         ret = ext4_fs_fini(&mp->fs);
         if (ret == EOK)
         {
@@ -1519,6 +1524,10 @@ int ext4_fopen2(ext4_file *file, const char *path, int flags)
 int ext4_fclose(ext4_file *file)
 {
     ext4_assert(file && file->mp);
+
+    EXT4_MP_LOCK(file->mp);
+    ext4_block_cache_flush(file->mp->fs.bdev);
+    EXT4_MP_UNLOCK(file->mp);
 
     file->mp = 0;
     file->flags = 0;
