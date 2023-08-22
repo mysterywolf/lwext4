@@ -1960,7 +1960,7 @@ Finish:
 int ext4_fseek(ext4_file *file, int64_t offset, uint32_t origin)
 {
     int ret = EOK;
-    int64_t new_offset;
+    uint64_t new_offset = 0;
 
     switch (origin) {
     case SEEK_SET:
