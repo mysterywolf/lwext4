@@ -35,7 +35,9 @@
 #include "dfs_ext.h"
 #include "dfs_ext_blockdev.h"
 
+#ifdef RT_USING_DFS_CACHE
 #include "dfs_pcache.h"
+#endif
 
 #ifdef PKG_USING_DLOG
 #include <dlog.h>
