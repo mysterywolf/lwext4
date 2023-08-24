@@ -35,7 +35,7 @@
 #include "dfs_ext.h"
 #include "dfs_ext_blockdev.h"
 
-#ifdef RT_USING_DFS_CACHE
+#ifdef RT_USING_PCACHE
 #include "dfs_pcache.h"
 #endif
 
@@ -97,7 +97,7 @@ static void ext4_unlock(void)
 
 static off_t dfs_ext_lseek(struct dfs_file *file, off_t offset, int whence);
 
-#ifdef RT_USING_DFS_CACHE
+#ifdef RT_USING_PCACHE
 static ssize_t dfs_ext_page_read(struct dfs_file *file, struct dfs_page *page);
 static ssize_t dfs_ext_page_write(struct dfs_page *page);
 
@@ -154,7 +154,7 @@ static struct dfs_vnode *dfs_ext_lookup(struct dfs_dentry *dentry)
                     case EXT4_INODE_MODE_FILE:
                         vnode->type = FT_REGULAR;
                         vnode->size = ext4_inode_get_size(&(ext_file->vnode.mp->fs.sb), ext_file->vnode.inode_ref.inode);
-#ifdef RT_USING_DFS_CACHE
+#ifdef RT_USING_PCACHE
                         vnode->aspace = dfs_aspace_create(dentry, vnode, &dfs_ext_aspace_ops);
 #endif
                         break;
@@ -248,7 +248,7 @@ static struct dfs_vnode *dfs_ext_create_vnode(struct dfs_dentry *dentry, int typ
                             vnode->type = FT_REGULAR;
                             vnode->size = ext4_inode_get_size(&(ext_file->vnode.mp->fs.sb), ext_file->vnode.inode_ref.inode);
                         }
-#ifdef RT_USING_DFS_CACHE
+#ifdef RT_USING_PCACHE
                         vnode->aspace = dfs_aspace_create(dentry, vnode, &dfs_ext_aspace_ops);
 #endif
                     }
@@ -896,7 +896,7 @@ static int dfs_ext_ioctl(struct dfs_file *file, int cmd, void *args)
     return ret;
 }
 
-#ifdef RT_USING_DFS_CACHE
+#ifdef RT_USING_PCACHE
 static ssize_t dfs_ext_page_read(struct dfs_file *file, struct dfs_page *page)
 {
     ssize_t ret = -EINVAL;
