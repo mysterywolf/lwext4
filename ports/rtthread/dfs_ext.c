@@ -754,7 +754,7 @@ static int dfs_ext_stat(struct dfs_dentry *dentry, struct stat *st)
             else
             {
 #ifdef RT_USING_PCACHE
-                st->st_size = (dentry->vnode->aspace && dentry->vnode) ? dentry->vnode->size : ext4_inode_get_size(&mp->fs.sb, inode_ref.inode);
+                st->st_size = (dentry->vnode && dentry->vnode->aspace) ? dentry->vnode->size : ext4_inode_get_size(&mp->fs.sb, inode_ref.inode);
 #else
                 st->st_size = ext4_inode_get_size(&mp->fs.sb, inode_ref.inode);
 #endif
