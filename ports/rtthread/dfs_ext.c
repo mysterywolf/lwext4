@@ -747,7 +747,18 @@ static int dfs_ext_stat(struct dfs_dentry *dentry, struct stat *st)
             st->st_mode = ext4_inode_get_mode(&mp->fs.sb, inode_ref.inode);
             st->st_uid = ext4_inode_get_uid(inode_ref.inode);
             st->st_gid = ext4_inode_get_gid(inode_ref.inode);
-            st->st_size = ext4_inode_get_size(&mp->fs.sb, inode_ref.inode);
+            if (S_IFDIR & st->st_mode)
+            {
+                st->st_size = ext4_inode_get_size(&mp->fs.sb, inode_ref.inode);
+            }
+            else
+            {
+#ifdef RT_USING_PCACHE
+                st->st_size = (dentry->vnode->aspace && dentry->vnode) ? dentry->vnode->size : ext4_inode_get_size(&mp->fs.sb, inode_ref.inode);
+#else
+                st->st_size = ext4_inode_get_size(&mp->fs.sb, inode_ref.inode);
+#endif
+            }
             st->st_atime = ext4_inode_get_access_time(inode_ref.inode);
             st->st_mtime = ext4_inode_get_modif_time(inode_ref.inode);
             st->st_ctime = ext4_inode_get_change_inode_time(inode_ref.inode);
