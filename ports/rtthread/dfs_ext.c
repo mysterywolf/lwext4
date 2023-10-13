@@ -792,6 +792,14 @@ int dfs_ext_setattr(struct dfs_dentry *dentry, struct dfs_attr *attr)
     if (fn)
     {
         ret = ext4_mode_set(fn, attr->st_mode);
+        if (attr->ia_valid & ATTR_ATIME_SET)
+        {
+            ret = ext4_atime_set(fn, attr->ia_atime.tv_sec);
+        }
+        if (attr->ia_valid & ATTR_ATIME_SET)
+        {
+            ret = ext4_mtime_set(fn, attr->ia_mtime.tv_sec);
+        }
         ext4_vnode_update_info(dentry->vnode);
         rt_free(fn);
     }
