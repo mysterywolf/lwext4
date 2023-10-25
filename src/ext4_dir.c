@@ -114,7 +114,7 @@ bool ext4_dir_csum_verify(struct ext4_inode_ref *inode_ref,
             return false;
         }
 
-        ptrdiff_t __unused diff = (char *)t - (char *)dirent;
+        ptrdiff_t __ext4_unused diff = (char *)t - (char *)dirent;
         uint32_t csum = ext4_dir_csum(inode_ref, dirent, diff);
         if (t->checksum != to_le32(csum))
             return false;
@@ -145,7 +145,7 @@ void ext4_dir_set_csum(struct ext4_inode_ref *inode_ref,
             return;
         }
 
-        ptrdiff_t __unused diff = (char *)t - (char *)dirent;
+        ptrdiff_t __ext4_unused diff = (char *)t - (char *)dirent;
         uint32_t csum = ext4_dir_csum(inode_ref, dirent, diff);
         t->checksum = to_le32(csum);
     }

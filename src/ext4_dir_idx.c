@@ -862,7 +862,7 @@ static int ext4_dir_dx_entry_comparator(const void *arg1, const void *arg2)
  *
  */
 static void
-ext4_dir_dx_insert_entry(struct ext4_inode_ref *inode_ref __unused,
+ext4_dir_dx_insert_entry(struct ext4_inode_ref *inode_ref __ext4_unused,
              struct ext4_dir_idx_block *index_block,
              uint32_t hash, uint32_t iblock)
 {

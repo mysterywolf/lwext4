@@ -105,7 +105,7 @@ static uint32_t ext4_balloc_bitmap_csum(struct ext4_sblock *sb,
 
 void ext4_balloc_set_bitmap_csum(struct ext4_sblock *sb,
                  struct ext4_bgroup *bg,
-                 void *bitmap __unused)
+                 void *bitmap __ext4_unused)
 {
     int desc_size = ext4_sb_get_desc_size(sb);
     uint32_t checksum = ext4_balloc_bitmap_csum(sb, bitmap);
@@ -126,7 +126,7 @@ void ext4_balloc_set_bitmap_csum(struct ext4_sblock *sb,
 static bool
 ext4_balloc_verify_bitmap_csum(struct ext4_sblock *sb,
                    struct ext4_bgroup *bg,
-                   void *bitmap __unused)
+                   void *bitmap __ext4_unused)
 {
     int desc_size = ext4_sb_get_desc_size(sb);
     uint32_t checksum = ext4_balloc_bitmap_csum(sb, bitmap);

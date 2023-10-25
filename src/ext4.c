@@ -424,7 +424,7 @@ static struct ext4_mountpoint *ext4_get_mount(const char *path)
     return mp;
 }
 
-__unused
+__ext4_unused
 static int __ext4_journal_start(const char *mount_point)
 {
     int r = EOK;
@@ -455,7 +455,7 @@ Finish:
     return r;
 }
 
-__unused
+__ext4_unused
 static int __ext4_journal_stop(const char *mount_point)
 {
     int r = EOK;
@@ -492,7 +492,7 @@ Finish:
     return r;
 }
 
-__unused
+__ext4_unused
 static int __ext4_recover(const char *mount_point)
 {
     struct ext4_mountpoint *mp = ext4_get_mount(mount_point);
@@ -550,7 +550,7 @@ Finish:
     return r;
 }
 
-__unused
+__ext4_unused
 static int __ext4_trans_start(struct ext4_mountpoint *mp)
 {
     int r = EOK;
@@ -569,7 +569,7 @@ Finish:
     return r;
 }
 
-__unused
+__ext4_unused
 static int __ext4_trans_stop(struct ext4_mountpoint *mp)
 {
     int r = EOK;
@@ -583,7 +583,7 @@ static int __ext4_trans_stop(struct ext4_mountpoint *mp)
     return r;
 }
 
-__unused
+__ext4_unused
 static void __ext4_trans_abort(struct ext4_mountpoint *mp)
 {
     if (mp->fs.jbd_journal && mp->fs.curr_trans) {
@@ -594,7 +594,7 @@ static void __ext4_trans_abort(struct ext4_mountpoint *mp)
     }
 }
 
-int ext4_journal_start(const char *mount_point __unused)
+int ext4_journal_start(const char *mount_point __ext4_unused)
 {
     int r = EOK;
 #if CONFIG_JOURNALING_ENABLE
@@ -603,7 +603,7 @@ int ext4_journal_start(const char *mount_point __unused)
     return r;
 }
 
-int ext4_journal_stop(const char *mount_point __unused)
+int ext4_journal_stop(const char *mount_point __ext4_unused)
 {
     int r = EOK;
 #if CONFIG_JOURNALING_ENABLE
@@ -612,7 +612,7 @@ int ext4_journal_stop(const char *mount_point __unused)
     return r;
 }
 
-int ext4_recover(const char *mount_point __unused)
+int ext4_recover(const char *mount_point __ext4_unused)
 {
     int r = EOK;
 #if CONFIG_JOURNALING_ENABLE
@@ -621,7 +621,7 @@ int ext4_recover(const char *mount_point __unused)
     return r;
 }
 
-static int ext4_trans_start(struct ext4_mountpoint *mp __unused)
+static int ext4_trans_start(struct ext4_mountpoint *mp __ext4_unused)
 {
     int r = EOK;
 #if CONFIG_JOURNALING_ENABLE
@@ -630,7 +630,7 @@ static int ext4_trans_start(struct ext4_mountpoint *mp __unused)
     return r;
 }
 
-static int ext4_trans_stop(struct ext4_mountpoint *mp __unused)
+static int ext4_trans_stop(struct ext4_mountpoint *mp __ext4_unused)
 {
     int r = EOK;
 #if CONFIG_JOURNALING_ENABLE
@@ -639,7 +639,7 @@ static int ext4_trans_stop(struct ext4_mountpoint *mp __unused)
     return r;
 }
 
-static void ext4_trans_abort(struct ext4_mountpoint *mp __unused)
+static void ext4_trans_abort(struct ext4_mountpoint *mp __ext4_unused)
 {
 #if CONFIG_JOURNALING_ENABLE
     __ext4_trans_abort(mp);

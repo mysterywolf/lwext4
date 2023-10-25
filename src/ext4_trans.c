@@ -86,8 +86,8 @@ int ext4_trans_block_get(struct ext4_blockdev *bdev,
     return r;
 }
 
-int ext4_trans_try_revoke_block(struct ext4_blockdev *bdev __unused,
-                    uint64_t lba __unused)
+int ext4_trans_try_revoke_block(struct ext4_blockdev *bdev __ext4_unused,
+                    uint64_t lba __ext4_unused)
 {
     int r = EOK;
 #if CONFIG_JOURNALING_ENABLE

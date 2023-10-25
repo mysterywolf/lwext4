@@ -1305,8 +1305,8 @@ int jbd_journal_start(struct jbd_fs *jbd_fs,
     return EOK;
 }
 
-static void jbd_trans_end_write(struct ext4_bcache *bc __unused,
-              struct ext4_buf *buf __unused,
+static void jbd_trans_end_write(struct ext4_bcache *bc __ext4_unused,
+              struct ext4_buf *buf __ext4_unused,
               int res,
               void *arg);
 
@@ -2098,7 +2098,7 @@ void jbd_journal_cp_trans(struct jbd_journal *journal, struct jbd_trans *trans)
 
 /**@brief  Update the start block of the journal when
  *         all the contents in a transaction reach the disk.*/
-static void jbd_trans_end_write(struct ext4_bcache *bc __unused,
+static void jbd_trans_end_write(struct ext4_bcache *bc __ext4_unused,
               struct ext4_buf *buf,
               int res,
               void *arg)

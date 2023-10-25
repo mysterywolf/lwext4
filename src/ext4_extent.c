@@ -495,7 +495,7 @@ static int ext4_allocate_single_block(struct ext4_inode_ref *inode_ref,
 
 static ext4_fsblk_t ext4_new_meta_blocks(struct ext4_inode_ref *inode_ref,
                      ext4_fsblk_t goal,
-                     uint32_t flags __unused,
+                     uint32_t flags __ext4_unused,
                      uint32_t *count, int *errp)
 {
     ext4_fsblk_t block = 0;
@@ -508,7 +508,7 @@ static ext4_fsblk_t ext4_new_meta_blocks(struct ext4_inode_ref *inode_ref,
 
 static void ext4_ext_free_blocks(struct ext4_inode_ref *inode_ref,
                  ext4_fsblk_t block, uint32_t count,
-                 uint32_t flags __unused)
+                 uint32_t flags __ext4_unused)
 {
     ext4_balloc_free_blocks(inode_ref, block, count);
 }
@@ -680,7 +680,7 @@ static uint32_t ext4_ext_block_csum(struct ext4_inode_ref *inode_ref,
 #endif
 
 static void
-ext4_extent_block_csum_set(struct ext4_inode_ref *inode_ref __unused,
+ext4_extent_block_csum_set(struct ext4_inode_ref *inode_ref __ext4_unused,
                struct ext4_extent_header *eh)
 {
     struct ext4_extent_tail *tail;
@@ -729,7 +729,7 @@ static void ext4_ext_drop_refs(struct ext4_inode_ref *inode_ref,
  */
 static int ext4_ext_check(struct ext4_inode_ref *inode_ref,
               struct ext4_extent_header *eh, uint16_t depth,
-              ext4_fsblk_t pblk __unused)
+              ext4_fsblk_t pblk __ext4_unused)
 {
     struct ext4_extent_tail *tail;
     struct ext4_sblock *sb = &inode_ref->fs->sb;
@@ -776,7 +776,7 @@ corrupted:
 static int read_extent_tree_block(struct ext4_inode_ref *inode_ref,
                   ext4_fsblk_t pblk, int32_t depth,
                   struct ext4_block *bh,
-                  uint32_t flags __unused)
+                  uint32_t flags __ext4_unused)
 {
     int err;
 
@@ -1985,7 +1985,7 @@ static int ext4_ext_zero_unwritten_range(struct ext4_inode_ref *inode_ref,
     return err;
 }
 
-__unused static void print_path(struct ext4_extent_path *path)
+__ext4_unused static void print_path(struct ext4_extent_path *path)
 {
     int32_t i = path->depth;
     while (i >= 0) {

@@ -207,7 +207,7 @@ static uint32_t ext4_xattr_block_checksum(struct ext4_inode_ref *inode_ref,
 #endif
 
 static void ext4_xattr_set_block_checksum(struct ext4_inode_ref *inode_ref,
-                      ext4_fsblk_t blocknr __unused,
+                      ext4_fsblk_t blocknr __ext4_unused,
                       struct ext4_xattr_header *header)
 {
     struct ext4_sblock *sb = &inode_ref->fs->sb;
