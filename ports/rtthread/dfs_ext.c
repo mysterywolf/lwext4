@@ -928,6 +928,18 @@ static int dfs_ext_rename(struct dfs_dentry *old_dentry, struct dfs_dentry *new_
 
 static int dfs_ext_truncate(struct dfs_file *file, off_t offset)
 {
+    struct dfs_ext4_file *ext_file = (struct dfs_ext4_file *)file->data;
+
+    if (ext_file)
+    {
+        ext4_ftruncate(&(ext_file->entry.file), offset);
+    }
+
+    if (file->vnode->size < offset)
+    {
+        file->vnode->size = offset;
+    }
+
     return 0;
 }
 
