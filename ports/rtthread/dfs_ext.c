@@ -876,7 +876,7 @@ static int dfs_ext_getdents(struct dfs_file *file, struct dirent *dirp, rt_uint3
         rentry = ext4_dir_entry_next(&(ext_file->entry.dir));
         if (rentry != NULL)
         {
-            strncpy(d->d_name, (char *)rentry->name, DFS_PATH_MAX);
+            strncpy(d->d_name, (char *)rentry->name, DIRENT_NAME_MAX);
             if (rentry->inode_type == EXT4_DE_DIR)
             {
                 d->d_type = DT_DIR;
