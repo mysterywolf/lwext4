@@ -833,14 +833,29 @@ int dfs_ext_setattr(struct dfs_dentry *dentry, struct dfs_attr *attr)
     fn = dfs_dentry_full_path(dentry);
     if (fn)
     {
-        ret = ext4_mode_set(fn, attr->st_mode);
+        if (attr->ia_valid & ATTR_MODE_SET)
+        {
+            ret = ext4_mode_set(fn, attr->st_mode);
+        }
         if (attr->ia_valid & ATTR_ATIME_SET)
         {
             ret = ext4_atime_set(fn, attr->ia_atime.tv_sec);
         }
-        if (attr->ia_valid & ATTR_ATIME_SET)
+        if (attr->ia_valid & ATTR_MTIME_SET)
         {
             ret = ext4_mtime_set(fn, attr->ia_mtime.tv_sec);
+        }
+        if (attr->ia_valid & ATTR_UID_SET)
+        {
+            uint32_t unuse = 0, gid = 0;
+            ext4_owner_get(fn, &unuse, &gid);
+            ret = ext4_owner_set(fn, attr->st_uid, gid);
+        }
+        if (attr->ia_valid & ATTR_GID_SET)
+        {
+            uint32_t unuse = 0, uid = 0;
+            ext4_owner_get(fn, &uid, &unuse);
+            ret = ext4_owner_set(fn, uid, attr->st_gid);
         }
         ext4_vnode_update_info(dentry->vnode);
         rt_free(fn);
