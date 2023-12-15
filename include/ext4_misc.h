@@ -133,11 +133,11 @@ static inline uint16_t reorder16(uint16_t n)
     while (0)
 
 #ifdef __GNUC__
- #ifndef __unused
- #define __unused __attribute__ ((__unused__))
+ #ifndef __ext4_unused // "__unused" conflicts with riscv`s include/bits/signal.h
+ #define __ext4_unused __attribute__ ((__unused__))
  #endif
 #else
- #define __unused
+ #define __ext4_unused
 #endif
 
 #ifndef offsetof

@@ -111,7 +111,7 @@ static uint32_t ext4_ialloc_bitmap_csum(struct ext4_sblock *sb, void *bitmap)
 #endif
 
 void ext4_ialloc_set_bitmap_csum(struct ext4_sblock *sb, struct ext4_bgroup *bg,
-                 void *bitmap __unused)
+                 void *bitmap __ext4_unused)
 {
     int desc_size = ext4_sb_get_desc_size(sb);
     uint32_t csum = ext4_ialloc_bitmap_csum(sb, bitmap);
@@ -131,7 +131,7 @@ void ext4_ialloc_set_bitmap_csum(struct ext4_sblock *sb, struct ext4_bgroup *bg,
 #if CONFIG_META_CSUM_ENABLE
 static bool
 ext4_ialloc_verify_bitmap_csum(struct ext4_sblock *sb, struct ext4_bgroup *bg,
-                   void *bitmap __unused)
+                   void *bitmap __ext4_unused)
 {
 
     int desc_size = ext4_sb_get_desc_size(sb);
