@@ -1724,8 +1724,14 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt)
             fblock_count++;
         }
 
-        r = ext4_blocks_get_direct(file->mp->fs.bdev, u8_buf, fblock_start,
+        if (fblock_start == 0) {
+            memset(u8_buf, 0, block_size * fblock_count);
+            r = EOK;
+        } else {
+            r = ext4_blocks_get_direct(file->mp->fs.bdev, u8_buf, fblock_start,
                        fblock_count);
+        }
+
         if (r != EOK)
             goto Finish;
 
