@@ -546,10 +546,10 @@ static off_t dfs_ext_lseek(struct dfs_file *file, off_t offset, int whence)
         }
         else if (ext_file->type == EXT4_DE_REG_FILE)
         {
-            ret = ext4_fseek(&(ext_file->entry.file), (int64_t)offset, whence);
-            if (ret == RT_EOK)
+            ret = generic_dfs_lseek(file, offset, whence);
+            if (ret >= 0)
             {
-                ret = ext_file->entry.file.fpos;
+                ext_file->entry.file.fpos = ret;
             }
         }
         rt_mutex_release(&file->vnode->lock);
