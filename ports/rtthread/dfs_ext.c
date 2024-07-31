@@ -610,7 +610,18 @@ static int dfs_ext_open(struct dfs_file *file)
             {
                 return -ENOENT;
             }
-            file->data = ext_file;
+            if (file->vnode->type == FT_DIRECTORY)
+            {
+                file->data = rt_calloc(1, sizeof(struct dfs_ext4_file));
+                rt_memcpy(file->data, ext_file, sizeof(struct dfs_ext4_file));
+                ext_file = (struct dfs_ext4_file *)file->data;
+                ext_file->entry.dir.next_off = 0;
+            }
+            else
+            {
+                file->data = ext_file;
+            }
+
             file->fpos = 0;
             return ret;
         }
