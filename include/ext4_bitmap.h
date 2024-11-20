@@ -51,7 +51,7 @@ extern "C" {
  * @param   bit bit to set*/
 static inline void ext4_bmap_bit_set(uint8_t *bmap, uint32_t bit)
 {
-	*(bmap + (bit >> 3)) |= (1 << (bit & 7));
+    *(bmap + (bit >> 3)) |= (1 << (bit & 7));
 }
 
 /**@brief   Clear bitmap bit.
@@ -59,7 +59,7 @@ static inline void ext4_bmap_bit_set(uint8_t *bmap, uint32_t bit)
  * @param   bit bit to clear*/
 static inline void ext4_bmap_bit_clr(uint8_t *bmap, uint32_t bit)
 {
-	*(bmap + (bit >> 3)) &= ~(1 << (bit & 7));
+    *(bmap + (bit >> 3)) &= ~(1 << (bit & 7));
 }
 
 /**@brief   Check if the bitmap bit is set.
@@ -67,7 +67,7 @@ static inline void ext4_bmap_bit_clr(uint8_t *bmap, uint32_t bit)
  * @param   bit bit to check*/
 static inline bool ext4_bmap_is_bit_set(uint8_t *bmap, uint32_t bit)
 {
-	return (*(bmap + (bit >> 3)) & (1 << (bit & 7)));
+    return (*(bmap + (bit >> 3)) & (1 << (bit & 7)));
 }
 
 /**@brief   Check if the bitmap bit is clear.
@@ -75,7 +75,7 @@ static inline bool ext4_bmap_is_bit_set(uint8_t *bmap, uint32_t bit)
  * @param   bit bit to check*/
 static inline bool ext4_bmap_is_bit_clr(uint8_t *bmap, uint32_t bit)
 {
-	return !ext4_bmap_is_bit_set(bmap, bit);
+    return !ext4_bmap_is_bit_set(bmap, bit);
 }
 
 /**@brief   Free range of bits in bitmap.
@@ -90,7 +90,7 @@ void ext4_bmap_bits_free(uint8_t *bmap, uint32_t sbit, uint32_t bcnt);
  * @param   bit_id output parameter (first free bit)
  * @return  standard error code*/
 int ext4_bmap_bit_find_clr(uint8_t *bmap, uint32_t sbit, uint32_t ebit,
-			   uint32_t *bit_id);
+               uint32_t *bit_id);
 
 #ifdef __cplusplus
 }

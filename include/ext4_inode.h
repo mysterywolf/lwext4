@@ -64,7 +64,7 @@ uint32_t ext4_inode_get_mode(struct ext4_sblock *sb, struct ext4_inode *inode);
  * @param mode  Mode to set to i-node
  */
 void ext4_inode_set_mode(struct ext4_sblock *sb, struct ext4_inode *inode,
-			 uint32_t mode);
+             uint32_t mode);
 
 /**@brief Get ID of the i-node owner (user id).
  * @param inode I-node to load uid from
@@ -169,7 +169,7 @@ void ext4_inode_set_links_cnt(struct ext4_inode *inode, uint16_t cnt);
  * @return Number of 512-bytes blocks
  */
 uint64_t ext4_inode_get_blocks_count(struct ext4_sblock *sb,
-				     struct ext4_inode *inode);
+                     struct ext4_inode *inode);
 
 /**@brief Set number of 512-bytes blocks used for i-node.
  * @param sb    Superblock
@@ -178,7 +178,7 @@ uint64_t ext4_inode_get_blocks_count(struct ext4_sblock *sb,
  * @return Error code
  */
 int ext4_inode_set_blocks_count(struct ext4_sblock *sb,
-				struct ext4_inode *inode, uint64_t cnt);
+                struct ext4_inode *inode, uint64_t cnt);
 
 /**@brief Get flags (features) of i-node.
  * @param inode I-node to get flags from
@@ -210,7 +210,7 @@ void ext4_inode_set_generation(struct ext4_inode *inode, uint32_t gen);
  * @return extra I-node size
  */
 uint16_t ext4_inode_get_extra_isize(struct ext4_sblock *sb,
-				    struct ext4_inode *inode);
+                    struct ext4_inode *inode);
 
 /**@brief Set extra I-node size field.
  * @param sb         Superblock
@@ -218,8 +218,8 @@ uint16_t ext4_inode_get_extra_isize(struct ext4_sblock *sb,
  * @param size       extra I-node size
  */
 void ext4_inode_set_extra_isize(struct ext4_sblock *sb,
-				struct ext4_inode *inode,
-				uint16_t size);
+                struct ext4_inode *inode,
+                uint16_t size);
 
 /**@brief Get address of block, where are extended attributes located.
  * @param inode I-node
@@ -227,7 +227,7 @@ void ext4_inode_set_extra_isize(struct ext4_sblock *sb,
  * @return Block address
  */
 uint64_t ext4_inode_get_file_acl(struct ext4_inode *inode,
-				 struct ext4_sblock *sb);
+                 struct ext4_sblock *sb);
 
 /**@brief Set address of block, where are extended attributes located.
  * @param inode    I-node
@@ -235,7 +235,7 @@ uint64_t ext4_inode_get_file_acl(struct ext4_inode *inode,
  * @param acl Block address
  */
 void ext4_inode_set_file_acl(struct ext4_inode *inode, struct ext4_sblock *sb,
-			     uint64_t acl);
+                 uint64_t acl);
 
 /**@brief Get block address of specified direct block.
  * @param inode I-node to load block from
@@ -250,7 +250,7 @@ uint32_t ext4_inode_get_direct_block(struct ext4_inode *inode, uint32_t idx);
  * @param block Physical block address
  */
 void ext4_inode_set_direct_block(struct ext4_inode *inode, uint32_t idx,
-				 uint32_t block);
+                 uint32_t block);
 
 /**@brief Get block address of specified indirect block.
  * @param inode I-node to get block address from
@@ -265,7 +265,7 @@ uint32_t ext4_inode_get_indirect_block(struct ext4_inode *inode, uint32_t idx);
  * @param block Physical block address
  */
 void ext4_inode_set_indirect_block(struct ext4_inode *inode, uint32_t idx,
-				   uint32_t block);
+                   uint32_t block);
 
 /**@brief Get device number
  * @param inode  I-node to get device number from
@@ -293,7 +293,7 @@ uint32_t ext4_inode_type(struct ext4_sblock *sb, struct ext4_inode *inode);
  * @return Result of check operation
  */
 bool ext4_inode_is_type(struct ext4_sblock *sb, struct ext4_inode *inode,
-			uint32_t type);
+            uint32_t type);
 
 /**@brief Check if i-node has specified flag.
  * @param inode I-node to check flags of
@@ -327,7 +327,7 @@ ext4_inode_get_csum(struct ext4_sblock *sb, struct ext4_inode *inode);
  */
 void
 ext4_inode_set_csum(struct ext4_sblock *sb, struct ext4_inode *inode,
-			uint32_t checksum);
+            uint32_t checksum);
 
 /**@brief Check if i-node can be truncated.
  * @param sb    Superblock

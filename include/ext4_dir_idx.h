@@ -56,9 +56,9 @@ extern "C" {
 #include <stdbool.h>
 
 struct ext4_dir_idx_block {
-	struct ext4_block b;
-	struct ext4_dir_idx_entry *entries;
-	struct ext4_dir_idx_entry *position;
+    struct ext4_block b;
+    struct ext4_dir_idx_entry *entries;
+    struct ext4_dir_idx_entry *position;
 };
 
 #define EXT4_DIR_DX_INIT_BCNT 2
@@ -70,7 +70,7 @@ struct ext4_dir_idx_block {
  * @return Error code
  */
 int ext4_dir_dx_init(struct ext4_inode_ref *dir,
-		     struct ext4_inode_ref *parent);
+             struct ext4_inode_ref *parent);
 
 /**@brief Try to find directory entry using directory index.
  * @param result    Output value - if entry will be found,
@@ -81,8 +81,8 @@ int ext4_dir_dx_init(struct ext4_inode_ref *dir,
  * @return Error code
  */
 int ext4_dir_dx_find_entry(struct ext4_dir_search_result *result,
-			   struct ext4_inode_ref *inode_ref, size_t name_len,
-			   const char *name);
+               struct ext4_inode_ref *inode_ref, size_t name_len,
+               const char *name);
 
 /**@brief Add new entry to indexed directory
  * @param parent Directory i-node
@@ -91,7 +91,7 @@ int ext4_dir_dx_find_entry(struct ext4_dir_search_result *result,
  * @return Error code
  */
 int ext4_dir_dx_add_entry(struct ext4_inode_ref *parent,
-			  struct ext4_inode_ref *child, const char *name, uint32_t name_len);
+              struct ext4_inode_ref *child, const char *name, uint32_t name_len);
 
 /**@brief Add new entry to indexed directory
  * @param dir           Directory i-node

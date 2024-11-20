@@ -59,122 +59,122 @@ Copyright (c) 2015 Grzegorz Kostka (kostka.grzegorz@gmail.com)  \n\
 Usage:                                                          \n\
 [-i] --input   - input file name (or blockdevice)               \n\
 [-w] --wpart   - windows partition mode                         \n\
-[-v] --verbose - verbose mode		                        \n\
+[-v] --verbose - verbose mode                               \n\
 \n";
 
 
 static bool open_linux(void)
 {
-	file_dev_name_set(input_name);
-	bd = file_dev_get();
-	if (!bd) {
-		printf("open_filedev: fail\n");
-		return false;
-	}
-	return true;
+    file_dev_name_set(input_name);
+    bd = file_dev_get();
+    if (!bd) {
+        printf("open_filedev: fail\n");
+        return false;
+    }
+    return true;
 }
 
 static bool open_windows(void)
 {
 #ifdef WIN32
-	file_windows_name_set(input_name);
-	bd = file_windows_dev_get();
-	if (!bd) {
-		printf("open_winpartition: fail\n");
-		return false;
-	}
-	return true;
+    file_windows_name_set(input_name);
+    bd = file_windows_dev_get();
+    if (!bd) {
+        printf("open_winpartition: fail\n");
+        return false;
+    }
+    return true;
 #else
-	printf("open_winpartition: this mode should be used only under windows "
-	       "!\n");
-	return false;
+    printf("open_winpartition: this mode should be used only under windows "
+           "!\n");
+    return false;
 #endif
 }
 
 static bool open_filedev(void)
 {
-	return winpart ? open_windows() : open_linux();
+    return winpart ? open_windows() : open_linux();
 }
 
 static bool parse_opt(int argc, char **argv)
 {
-	int option_index = 0;
-	int c;
+    int option_index = 0;
+    int c;
 
-	static struct option long_options[] = {
-	    {"input", required_argument, 0, 'i'},
-	    {"wpart", no_argument, 0, 'w'},
-	    {"verbose", no_argument, 0, 'v'},
-	    {"version", no_argument, 0, 'x'},
-	    {0, 0, 0, 0}};
+    static struct option long_options[] = {
+        {"input", required_argument, 0, 'i'},
+        {"wpart", no_argument, 0, 'w'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'x'},
+        {0, 0, 0, 0}};
 
-	while (-1 != (c = getopt_long(argc, argv, "i:wvx",
-				      long_options, &option_index))) {
+    while (-1 != (c = getopt_long(argc, argv, "i:wvx",
+                      long_options, &option_index))) {
 
-		switch (c) {
-		case 'i':
-			input_name = optarg;
-			break;
-		case 'w':
-			winpart = true;
-			break;
-		case 'v':
-			verbose = true;
-			break;
-		case 'x':
-			puts(VERSION);
-			exit(0);
-			break;
-		default:
-			printf("%s", usage);
-			return false;
-		}
-	}
+        switch (c) {
+        case 'i':
+            input_name = optarg;
+            break;
+        case 'w':
+            winpart = true;
+            break;
+        case 'v':
+            verbose = true;
+            break;
+        case 'x':
+            puts(VERSION);
+            exit(0);
+            break;
+        default:
+            printf("%s", usage);
+            return false;
+        }
+    }
 
-	return true;
+    return true;
 }
 
 int main(int argc, char **argv)
 {
-	int r;
-	if (!parse_opt(argc, argv)){
-		printf("parse_opt error\n");
-		return EXIT_FAILURE;
-	}
+    int r;
+    if (!parse_opt(argc, argv)){
+        printf("parse_opt error\n");
+        return EXIT_FAILURE;
+    }
 
-	if (!open_filedev()) {
-		printf("open_filedev error\n");
-		return EXIT_FAILURE;
-	}
+    if (!open_filedev()) {
+        printf("open_filedev error\n");
+        return EXIT_FAILURE;
+    }
 
-	if (verbose)
-		ext4_dmask_set(DEBUG_ALL);
+    if (verbose)
+        ext4_dmask_set(DEBUG_ALL);
 
-	printf("ext4_mbr\n");
-	struct ext4_mbr_bdevs bdevs;
-	r = ext4_mbr_scan(bd, &bdevs);
-	if (r != EOK) {
-		printf("ext4_mbr_scan error\n");
-		return EXIT_FAILURE;
-	}
+    printf("ext4_mbr\n");
+    struct ext4_mbr_bdevs bdevs;
+    r = ext4_mbr_scan(bd, &bdevs);
+    if (r != EOK) {
+        printf("ext4_mbr_scan error\n");
+        return EXIT_FAILURE;
+    }
 
-	int i;
-	printf("ext4_mbr_scan:\n");
-	for (i = 0; i < 4; i++) {
-		printf("mbr_entry %d:\n", i);
-		if (!bdevs.partitions[i].bdif) {
-			printf("\tempty/unknown\n");
-			continue;
-		}
+    int i;
+    printf("ext4_mbr_scan:\n");
+    for (i = 0; i < 4; i++) {
+        printf("mbr_entry %d:\n", i);
+        if (!bdevs.partitions[i].bdif) {
+            printf("\tempty/unknown\n");
+            continue;
+        }
 
-		printf("\toffeset: 0x%"PRIx64", %"PRIu64"MB\n",
-			bdevs.partitions[i].part_offset,
-			bdevs.partitions[i].part_offset / (1024 * 1024));
-		printf("\tsize:    0x%"PRIx64", %"PRIu64"MB\n",
-			bdevs.partitions[i].part_size,
-			bdevs.partitions[i].part_size / (1024 * 1024));
-	}
+        printf("\toffeset: 0x%"PRIx64", %"PRIu64"MB\n",
+            bdevs.partitions[i].part_offset,
+            bdevs.partitions[i].part_offset / (1024 * 1024));
+        printf("\tsize:    0x%"PRIx64", %"PRIu64"MB\n",
+            bdevs.partitions[i].part_size,
+            bdevs.partitions[i].part_size / (1024 * 1024));
+    }
 
 
-	return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }

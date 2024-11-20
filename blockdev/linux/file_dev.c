@@ -37,10 +37,10 @@
 #include <string.h>
 
 /**@brief   Default filename.*/
-static const char *fname = "ext2";
+static const char *fname = "ExtFs.img";
 
 /**@brief   Image block size.*/
-#define EXT4_FILEDEV_BSIZE 512
+#define EXT4_FILEDEV_BSIZE 4096
 
 /**@brief   Image file descriptor.*/
 static FILE *dev_file;
@@ -50,93 +50,93 @@ static FILE *dev_file;
 /**********************BLOCKDEV INTERFACE**************************************/
 static int file_dev_open(struct ext4_blockdev *bdev);
 static int file_dev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id,
-			 uint32_t blk_cnt);
+             uint32_t blk_cnt);
 static int file_dev_bwrite(struct ext4_blockdev *bdev, const void *buf,
-			  uint64_t blk_id, uint32_t blk_cnt);
+              uint64_t blk_id, uint32_t blk_cnt);
 static int file_dev_close(struct ext4_blockdev *bdev);
 
 /******************************************************************************/
 EXT4_BLOCKDEV_STATIC_INSTANCE(file_dev, EXT4_FILEDEV_BSIZE, 0, file_dev_open,
-		file_dev_bread, file_dev_bwrite, file_dev_close, 0, 0);
+        file_dev_bread, file_dev_bwrite, file_dev_close, 0, 0);
 
 /******************************************************************************/
 static int file_dev_open(struct ext4_blockdev *bdev)
 {
-	dev_file = fopen(fname, "r+b");
+    dev_file = fopen(fname, "r+b");
 
-	if (!dev_file)
-		return EIO;
+    if (!dev_file)
+        return EIO;
 
-	/*No buffering at file.*/
-	setbuf(dev_file, 0);
+    /*No buffering at file.*/
+    setbuf(dev_file, 0);
 
-	if (fseeko(dev_file, 0, SEEK_END))
-		return EFAULT;
+    if (fseeko(dev_file, 0, SEEK_END))
+        return EFAULT;
 
-	file_dev.part_offset = 0;
-	file_dev.part_size = ftello(dev_file);
-	file_dev.bdif->ph_bcnt = file_dev.part_size / file_dev.bdif->ph_bsize;
+    file_dev.part_offset = 0;
+    file_dev.part_size = ftello(dev_file);
+    file_dev.bdif->ph_bcnt = file_dev.part_size / file_dev.bdif->ph_bsize;
 
-	return EOK;
+    return EOK;
 }
 
 /******************************************************************************/
 
 static int file_dev_bread(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id,
-			 uint32_t blk_cnt)
+             uint32_t blk_cnt)
 {
-	if (fseeko(dev_file, blk_id * bdev->bdif->ph_bsize, SEEK_SET))
-		return EIO;
-	if (!blk_cnt)
-		return EOK;
-	if (!fread(buf, bdev->bdif->ph_bsize * blk_cnt, 1, dev_file))
-		return EIO;
+    if (fseeko(dev_file, blk_id * bdev->bdif->ph_bsize, SEEK_SET))
+        return EIO;
+    if (!blk_cnt)
+        return EOK;
+    if (!fread(buf, bdev->bdif->ph_bsize * blk_cnt, 1, dev_file))
+        return EIO;
 
-	return EOK;
+    return EOK;
 }
 
 static void drop_cache(void)
 {
 #if defined(__linux__) && DROP_LINUXCACHE_BUFFERS
-	int fd;
-	char *data = "3";
+    int fd;
+    char *data = "3";
 
-	sync();
-	fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
-	write(fd, data, sizeof(char));
-	close(fd);
+    sync();
+    fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
+    write(fd, data, sizeof(char));
+    close(fd);
 #endif
 }
 
 /******************************************************************************/
 static int file_dev_bwrite(struct ext4_blockdev *bdev, const void *buf,
-			  uint64_t blk_id, uint32_t blk_cnt)
+              uint64_t blk_id, uint32_t blk_cnt)
 {
-	if (fseeko(dev_file, blk_id * bdev->bdif->ph_bsize, SEEK_SET))
-		return EIO;
-	if (!blk_cnt)
-		return EOK;
-	if (!fwrite(buf, bdev->bdif->ph_bsize * blk_cnt, 1, dev_file))
-		return EIO;
+    if (fseeko(dev_file, blk_id * bdev->bdif->ph_bsize, SEEK_SET))
+        return EIO;
+    if (!blk_cnt)
+        return EOK;
+    if (!fwrite(buf, bdev->bdif->ph_bsize * blk_cnt, 1, dev_file))
+        return EIO;
 
-	drop_cache();
-	return EOK;
+    drop_cache();
+    return EOK;
 }
 /******************************************************************************/
 static int file_dev_close(struct ext4_blockdev *bdev)
 {
-	fclose(dev_file);
-	return EOK;
+    fclose(dev_file);
+    return EOK;
 }
 
 /******************************************************************************/
 struct ext4_blockdev *file_dev_get(void)
 {
-	return &file_dev;
+    return &file_dev;
 }
 /******************************************************************************/
 void file_dev_name_set(const char *n)
 {
-	fname = n;
+    fname = n;
 }
 /******************************************************************************/

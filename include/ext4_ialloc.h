@@ -55,7 +55,7 @@ extern "C" {
  * @param bitmap bitmap buffer
  */
 void ext4_ialloc_set_bitmap_csum(struct ext4_sblock *sb, struct ext4_bgroup *bg,
-				 void *bitmap);
+                 void *bitmap);
 
 /**@brief Free i-node number and modify filesystem data structers.
  * @param fs     Filesystem, where the i-node is located

@@ -59,14 +59,14 @@ extern "C" {
  * @return Address of block with block bitmap
  */
 static inline uint64_t ext4_bg_get_block_bitmap(struct ext4_bgroup *bg,
-						struct ext4_sblock *s)
+                        struct ext4_sblock *s)
 {
-	uint64_t v = to_le32(bg->block_bitmap_lo);
+    uint64_t v = to_le32(bg->block_bitmap_lo);
 
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		v |= (uint64_t)to_le32(bg->block_bitmap_hi) << 32;
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        v |= (uint64_t)to_le32(bg->block_bitmap_hi) << 32;
 
-	return v;
+    return v;
 }
 
 /**@brief Set address of block with data block bitmap.
@@ -75,12 +75,12 @@ static inline uint64_t ext4_bg_get_block_bitmap(struct ext4_bgroup *bg,
  * @param blk block to set
  */
 static inline void ext4_bg_set_block_bitmap(struct ext4_bgroup *bg,
-					    struct ext4_sblock *s, uint64_t blk)
+                        struct ext4_sblock *s, uint64_t blk)
 {
 
-	bg->block_bitmap_lo = to_le32((uint32_t)blk);
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		bg->block_bitmap_hi = to_le32(blk >> 32);
+    bg->block_bitmap_lo = to_le32((uint32_t)blk);
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        bg->block_bitmap_hi = to_le32(blk >> 32);
 
 }
 
@@ -90,15 +90,15 @@ static inline void ext4_bg_set_block_bitmap(struct ext4_bgroup *bg,
  * @return Address of block with i-node bitmap
  */
 static inline uint64_t ext4_bg_get_inode_bitmap(struct ext4_bgroup *bg,
-						struct ext4_sblock *s)
+                        struct ext4_sblock *s)
 {
 
-	uint64_t v = to_le32(bg->inode_bitmap_lo);
+    uint64_t v = to_le32(bg->inode_bitmap_lo);
 
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		v |= (uint64_t)to_le32(bg->inode_bitmap_hi) << 32;
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        v |= (uint64_t)to_le32(bg->inode_bitmap_hi) << 32;
 
-	return v;
+    return v;
 }
 
 /**@brief Set address of block with i-node bitmap.
@@ -107,11 +107,11 @@ static inline uint64_t ext4_bg_get_inode_bitmap(struct ext4_bgroup *bg,
  * @param blk block to set
  */
 static inline void ext4_bg_set_inode_bitmap(struct ext4_bgroup *bg,
-					    struct ext4_sblock *s, uint64_t blk)
+                        struct ext4_sblock *s, uint64_t blk)
 {
-	bg->inode_bitmap_lo = to_le32((uint32_t)blk);
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		bg->inode_bitmap_hi = to_le32(blk >> 32);
+    bg->inode_bitmap_lo = to_le32((uint32_t)blk);
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        bg->inode_bitmap_hi = to_le32(blk >> 32);
 
 }
 
@@ -123,14 +123,14 @@ static inline void ext4_bg_set_inode_bitmap(struct ext4_bgroup *bg,
  */
 static inline uint64_t
 ext4_bg_get_inode_table_first_block(struct ext4_bgroup *bg,
-				    struct ext4_sblock *s)
+                    struct ext4_sblock *s)
 {
-	uint64_t v = to_le32(bg->inode_table_first_block_lo);
+    uint64_t v = to_le32(bg->inode_table_first_block_lo);
 
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		v |= (uint64_t)to_le32(bg->inode_table_first_block_hi) << 32;
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        v |= (uint64_t)to_le32(bg->inode_table_first_block_hi) << 32;
 
-	return v;
+    return v;
 }
 
 /**@brief Set address of the first block of the i-node table.
@@ -140,11 +140,11 @@ ext4_bg_get_inode_table_first_block(struct ext4_bgroup *bg,
  */
 static inline void
 ext4_bg_set_inode_table_first_block(struct ext4_bgroup *bg,
-				    struct ext4_sblock *s, uint64_t blk)
+                    struct ext4_sblock *s, uint64_t blk)
 {
-	bg->inode_table_first_block_lo = to_le32((uint32_t)blk);
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		bg->inode_table_first_block_hi = to_le32(blk >> 32);
+    bg->inode_table_first_block_lo = to_le32((uint32_t)blk);
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        bg->inode_table_first_block_hi = to_le32(blk >> 32);
 }
 
 /**@brief Get number of free blocks in block group.
@@ -153,14 +153,14 @@ ext4_bg_set_inode_table_first_block(struct ext4_bgroup *bg,
  * @return Number of free blocks in block group
  */
 static inline uint32_t ext4_bg_get_free_blocks_count(struct ext4_bgroup *bg,
-						     struct ext4_sblock *s)
+                             struct ext4_sblock *s)
 {
-	uint32_t v = to_le16(bg->free_blocks_count_lo);
+    uint32_t v = to_le16(bg->free_blocks_count_lo);
 
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		v |= (uint32_t)to_le16(bg->free_blocks_count_hi) << 16;
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        v |= (uint32_t)to_le16(bg->free_blocks_count_hi) << 16;
 
-	return v;
+    return v;
 }
 
 /**@brief Set number of free blocks in block group.
@@ -169,12 +169,12 @@ static inline uint32_t ext4_bg_get_free_blocks_count(struct ext4_bgroup *bg,
  * @param cnt Number of free blocks in block group
  */
 static inline void ext4_bg_set_free_blocks_count(struct ext4_bgroup *bg,
-						 struct ext4_sblock *s,
-						 uint32_t cnt)
+                         struct ext4_sblock *s,
+                         uint32_t cnt)
 {
-	bg->free_blocks_count_lo = to_le16((cnt << 16) >> 16);
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		bg->free_blocks_count_hi = to_le16(cnt >> 16);
+    bg->free_blocks_count_lo = to_le16((cnt << 16) >> 16);
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        bg->free_blocks_count_hi = to_le16(cnt >> 16);
 }
 
 /**@brief Get number of free i-nodes in block group.
@@ -183,14 +183,14 @@ static inline void ext4_bg_set_free_blocks_count(struct ext4_bgroup *bg,
  * @return Number of free i-nodes in block group
  */
 static inline uint32_t ext4_bg_get_free_inodes_count(struct ext4_bgroup *bg,
-						     struct ext4_sblock *s)
+                             struct ext4_sblock *s)
 {
-	uint32_t v = to_le16(bg->free_inodes_count_lo);
+    uint32_t v = to_le16(bg->free_inodes_count_lo);
 
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		v |= (uint32_t)to_le16(bg->free_inodes_count_hi) << 16;
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        v |= (uint32_t)to_le16(bg->free_inodes_count_hi) << 16;
 
-	return v;
+    return v;
 }
 
 /**@brief Set number of free i-nodes in block group.
@@ -199,12 +199,12 @@ static inline uint32_t ext4_bg_get_free_inodes_count(struct ext4_bgroup *bg,
  * @param cnt Number of free i-nodes in block group
  */
 static inline void ext4_bg_set_free_inodes_count(struct ext4_bgroup *bg,
-						 struct ext4_sblock *s,
-						 uint32_t cnt)
+                         struct ext4_sblock *s,
+                         uint32_t cnt)
 {
-	bg->free_inodes_count_lo = to_le16((cnt << 16) >> 16);
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		bg->free_inodes_count_hi = to_le16(cnt >> 16);
+    bg->free_inodes_count_lo = to_le16((cnt << 16) >> 16);
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        bg->free_inodes_count_hi = to_le16(cnt >> 16);
 }
 
 /**@brief Get number of used directories in block group.
@@ -213,14 +213,14 @@ static inline void ext4_bg_set_free_inodes_count(struct ext4_bgroup *bg,
  * @return Number of used directories in block group
  */
 static inline uint32_t ext4_bg_get_used_dirs_count(struct ext4_bgroup *bg,
-						   struct ext4_sblock *s)
+                           struct ext4_sblock *s)
 {
-	uint32_t v = to_le16(bg->used_dirs_count_lo);
+    uint32_t v = to_le16(bg->used_dirs_count_lo);
 
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		v |= (uint32_t)to_le16(bg->used_dirs_count_hi) << 16;
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        v |= (uint32_t)to_le16(bg->used_dirs_count_hi) << 16;
 
-	return v;
+    return v;
 }
 
 /**@brief Set number of used directories in block group.
@@ -229,12 +229,12 @@ static inline uint32_t ext4_bg_get_used_dirs_count(struct ext4_bgroup *bg,
  * @param cnt Number of used directories in block group
  */
 static inline void ext4_bg_set_used_dirs_count(struct ext4_bgroup *bg,
-					       struct ext4_sblock *s,
-					       uint32_t cnt)
+                           struct ext4_sblock *s,
+                           uint32_t cnt)
 {
-	bg->used_dirs_count_lo = to_le16((cnt << 16) >> 16);
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		bg->used_dirs_count_hi = to_le16(cnt >> 16);
+    bg->used_dirs_count_lo = to_le16((cnt << 16) >> 16);
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        bg->used_dirs_count_hi = to_le16(cnt >> 16);
 }
 
 /**@brief Get number of unused i-nodes.
@@ -243,15 +243,15 @@ static inline void ext4_bg_set_used_dirs_count(struct ext4_bgroup *bg,
  * @return Number of unused i-nodes
  */
 static inline uint32_t ext4_bg_get_itable_unused(struct ext4_bgroup *bg,
-						 struct ext4_sblock *s)
+                         struct ext4_sblock *s)
 {
 
-	uint32_t v = to_le16(bg->itable_unused_lo);
+    uint32_t v = to_le16(bg->itable_unused_lo);
 
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		v |= (uint32_t)to_le16(bg->itable_unused_hi) << 16;
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        v |= (uint32_t)to_le16(bg->itable_unused_hi) << 16;
 
-	return v;
+    return v;
 }
 
 /**@brief Set number of unused i-nodes.
@@ -260,12 +260,12 @@ static inline uint32_t ext4_bg_get_itable_unused(struct ext4_bgroup *bg,
  * @param cnt Number of unused i-nodes
  */
 static inline void ext4_bg_set_itable_unused(struct ext4_bgroup *bg,
-					     struct ext4_sblock *s,
-					     uint32_t cnt)
+                         struct ext4_sblock *s,
+                         uint32_t cnt)
 {
-	bg->itable_unused_lo = to_le16((cnt << 16) >> 16);
-	if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
-		bg->itable_unused_hi = to_le16(cnt >> 16);
+    bg->itable_unused_lo = to_le16((cnt << 16) >> 16);
+    if (ext4_sb_get_desc_size(s) > EXT4_MIN_BLOCK_GROUP_DESCRIPTOR_SIZE)
+        bg->itable_unused_hi = to_le16(cnt >> 16);
 }
 
 /**@brief  Set checksum of block group.
@@ -274,7 +274,7 @@ static inline void ext4_bg_set_itable_unused(struct ext4_bgroup *bg,
  */
 static inline void ext4_bg_set_checksum(struct ext4_bgroup *bg, uint16_t crc)
 {
-	bg->checksum = to_le16(crc);
+    bg->checksum = to_le16(crc);
 }
 
 /**@brief Check if block group has a flag.
@@ -284,7 +284,7 @@ static inline void ext4_bg_set_checksum(struct ext4_bgroup *bg, uint16_t crc)
  */
 static inline bool ext4_bg_has_flag(struct ext4_bgroup *bg, uint32_t f)
 {
-	return to_le16(bg->flags) & f;
+    return to_le16(bg->flags) & f;
 }
 
 /**@brief Set flag of block group.
@@ -293,9 +293,9 @@ static inline bool ext4_bg_has_flag(struct ext4_bgroup *bg, uint32_t f)
  */
 static inline void ext4_bg_set_flag(struct ext4_bgroup *bg, uint32_t f)
 {
-	uint16_t flags = to_le16(bg->flags);
-	flags |= f;
-	bg->flags = to_le16(flags);
+    uint16_t flags = to_le16(bg->flags);
+    flags |= f;
+    bg->flags = to_le16(flags);
 }
 
 /**@brief Clear flag of block group.
@@ -304,9 +304,9 @@ static inline void ext4_bg_set_flag(struct ext4_bgroup *bg, uint32_t f)
  */
 static inline void ext4_bg_clear_flag(struct ext4_bgroup *bg, uint32_t f)
 {
-	uint16_t flags = to_le16(bg->flags);
-	flags &= ~f;
-	bg->flags = to_le16(flags);
+    uint16_t flags = to_le16(bg->flags);
+    flags &= ~f;
+    bg->flags = to_le16(flags);
 }
 
 /**@brief Calculate CRC16 of the block group.

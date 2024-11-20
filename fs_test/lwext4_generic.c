@@ -99,177 +99,177 @@ void io_timings_clear(void)
 
 const struct ext4_io_stats *io_timings_get(uint32_t time_sum_ms)
 {
-	return NULL;
+    return NULL;
 }
 
 uint32_t tim_get_ms(void)
 {
-	struct timeval t;
-	gettimeofday(&t, NULL);
-	return (t.tv_sec * 1000) + (t.tv_usec / 1000);
+    struct timeval t;
+    gettimeofday(&t, NULL);
+    return (t.tv_sec * 1000) + (t.tv_usec / 1000);
 }
 
 uint64_t tim_get_us(void)
 {
-	struct timeval t;
-	gettimeofday(&t, NULL);
-	return (t.tv_sec * 1000000) + (t.tv_usec);
+    struct timeval t;
+    gettimeofday(&t, NULL);
+    return (t.tv_sec * 1000000) + (t.tv_usec);
 }
 
 static bool open_linux(void)
 {
-	file_dev_name_set(input_name);
-	bd = file_dev_get();
-	if (!bd) {
-		printf("open_filedev: fail\n");
-		return false;
-	}
-	return true;
+    file_dev_name_set(input_name);
+    bd = file_dev_get();
+    if (!bd) {
+        printf("open_filedev: fail\n");
+        return false;
+    }
+    return true;
 }
 
 static bool open_windows(void)
 {
 #ifdef WIN32
-	file_windows_name_set(input_name);
-	bd = file_windows_dev_get();
-	if (!bd) {
-		printf("open_winpartition: fail\n");
-		return false;
-	}
-	return true;
+    file_windows_name_set(input_name);
+    bd = file_windows_dev_get();
+    if (!bd) {
+        printf("open_winpartition: fail\n");
+        return false;
+    }
+    return true;
 #else
-	printf("open_winpartition: this mode should be used only under windows "
-	       "!\n");
-	return false;
+    printf("open_winpartition: this mode should be used only under windows "
+           "!\n");
+    return false;
 #endif
 }
 
 static bool open_filedev(void)
 {
-	return winpart ? open_windows() : open_linux();
+    return winpart ? open_windows() : open_linux();
 }
 
 static bool parse_opt(int argc, char **argv)
 {
-	int option_index = 0;
-	int c;
+    int option_index = 0;
+    int c;
 
-	static struct option long_options[] = {
-	    {"input", required_argument, 0, 'i'},
-	    {"rw_size", required_argument, 0, 's'},
-	    {"rw_count", required_argument, 0, 'c'},
-	    {"dirs", required_argument, 0, 'd'},
-	    {"clean", no_argument, 0, 'l'},
-	    {"bstat", no_argument, 0, 'b'},
-	    {"sbstat", no_argument, 0, 't'},
-	    {"wpart", no_argument, 0, 'w'},
-	    {"verbose", no_argument, 0, 'v'},
-	    {"version", no_argument, 0, 'x'},
-	    {0, 0, 0, 0}};
+    static struct option long_options[] = {
+        {"input", required_argument, 0, 'i'},
+        {"rw_size", required_argument, 0, 's'},
+        {"rw_count", required_argument, 0, 'c'},
+        {"dirs", required_argument, 0, 'd'},
+        {"clean", no_argument, 0, 'l'},
+        {"bstat", no_argument, 0, 'b'},
+        {"sbstat", no_argument, 0, 't'},
+        {"wpart", no_argument, 0, 'w'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'x'},
+        {0, 0, 0, 0}};
 
-	while (-1 != (c = getopt_long(argc, argv, "i:s:c:q:d:lbtwvx",
-				      long_options, &option_index))) {
+    while (-1 != (c = getopt_long(argc, argv, "i:s:c:q:d:lbtwvx",
+                      long_options, &option_index))) {
 
-		switch (c) {
-		case 'i':
-			strcpy(input_name, optarg);
-			break;
-		case 's':
-			rw_szie = atoi(optarg);
-			break;
-		case 'c':
-			rw_count = atoi(optarg);
-			break;
-		case 'd':
-			dir_cnt = atoi(optarg);
-			break;
-		case 'l':
-			cleanup_flag = true;
-			break;
-		case 'b':
-			bstat = true;
-			break;
-		case 't':
-			sbstat = true;
-			break;
-		case 'w':
-			winpart = true;
-			break;
-		case 'v':
-			verbose = true;
-			break;
-		case 'x':
-			puts(VERSION);
-			exit(0);
-			break;
-		default:
-			printf("%s", usage);
-			return false;
-		}
-	}
-	return true;
+        switch (c) {
+        case 'i':
+            strcpy(input_name, optarg);
+            break;
+        case 's':
+            rw_szie = atoi(optarg);
+            break;
+        case 'c':
+            rw_count = atoi(optarg);
+            break;
+        case 'd':
+            dir_cnt = atoi(optarg);
+            break;
+        case 'l':
+            cleanup_flag = true;
+            break;
+        case 'b':
+            bstat = true;
+            break;
+        case 't':
+            sbstat = true;
+            break;
+        case 'w':
+            winpart = true;
+            break;
+        case 'v':
+            verbose = true;
+            break;
+        case 'x':
+            puts(VERSION);
+            exit(0);
+            break;
+        default:
+            printf("%s", usage);
+            return false;
+        }
+    }
+    return true;
 }
 
 int main(int argc, char **argv)
 {
-	if (!parse_opt(argc, argv))
-		return EXIT_FAILURE;
+    if (!parse_opt(argc, argv))
+        return EXIT_FAILURE;
 
-	printf("ext4_generic\n");
-	printf("test conditions:\n");
-	printf("\timput name: %s\n", input_name);
-	printf("\trw size: %d\n", rw_szie);
-	printf("\trw count: %d\n", rw_count);
+    printf("ext4_generic\n");
+    printf("test conditions:\n");
+    printf("\timput name: %s\n", input_name);
+    printf("\trw size: %d\n", rw_szie);
+    printf("\trw count: %d\n", rw_count);
 
-	if (!open_filedev()) {
-		printf("open_filedev error\n");
-		return EXIT_FAILURE;
-	}
+    if (!open_filedev()) {
+        printf("open_filedev error\n");
+        return EXIT_FAILURE;
+    }
 
-	if (verbose)
-		ext4_dmask_set(DEBUG_ALL);
+    if (verbose)
+        ext4_dmask_set(DEBUG_ALL);
 
-	if (!test_lwext4_mount(bd, bc))
-		return EXIT_FAILURE;
+    if (!test_lwext4_mount(bd, bc))
+        return EXIT_FAILURE;
 
-	test_lwext4_cleanup();
+    test_lwext4_cleanup();
 
-	if (sbstat)
-		test_lwext4_mp_stats();
+    if (sbstat)
+        test_lwext4_mp_stats();
 
-	test_lwext4_dir_ls("/mp/");
-	fflush(stdout);
-	if (!test_lwext4_dir_test(dir_cnt))
-		return EXIT_FAILURE;
+    test_lwext4_dir_ls("/mp/");
+    fflush(stdout);
+    if (!test_lwext4_dir_test(dir_cnt))
+        return EXIT_FAILURE;
 
-	fflush(stdout);
-	uint8_t *rw_buff = malloc(rw_szie);
-	if (!rw_buff) {
-		free(rw_buff);
-		return EXIT_FAILURE;
-	}
-	if (!test_lwext4_file_test(rw_buff, rw_szie, rw_count)) {
-		free(rw_buff);
-		return EXIT_FAILURE;
-	}
+    fflush(stdout);
+    uint8_t *rw_buff = malloc(rw_szie);
+    if (!rw_buff) {
+        free(rw_buff);
+        return EXIT_FAILURE;
+    }
+    if (!test_lwext4_file_test(rw_buff, rw_szie, rw_count)) {
+        free(rw_buff);
+        return EXIT_FAILURE;
+    }
 
-	free(rw_buff);
+    free(rw_buff);
 
-	fflush(stdout);
-	test_lwext4_dir_ls("/mp/");
+    fflush(stdout);
+    test_lwext4_dir_ls("/mp/");
 
-	if (sbstat)
-		test_lwext4_mp_stats();
+    if (sbstat)
+        test_lwext4_mp_stats();
 
-	if (cleanup_flag)
-		test_lwext4_cleanup();
+    if (cleanup_flag)
+        test_lwext4_cleanup();
 
-	if (bstat)
-		test_lwext4_block_stats();
+    if (bstat)
+        test_lwext4_block_stats();
 
-	if (!test_lwext4_umount())
-		return EXIT_FAILURE;
+    if (!test_lwext4_umount())
+        return EXIT_FAILURE;
 
-	printf("\ntest finished\n");
-	return EXIT_SUCCESS;
+    printf("\ntest finished\n");
+    return EXIT_SUCCESS;
 }

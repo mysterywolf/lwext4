@@ -49,9 +49,9 @@ uint32_t tim_get_ms(void);
 uint64_t tim_get_us(void);
 
 struct ext4_io_stats {
-	float io_read;
-	float io_write;
-	float cpu;
+    float io_read;
+    float io_write;
+    float cpu;
 };
 
 void io_timings_clear(void);

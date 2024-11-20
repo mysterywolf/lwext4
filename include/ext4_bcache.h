@@ -48,109 +48,109 @@ extern "C" {
 #include <misc/tree.h>
 #include <misc/queue.h>
 
-#define EXT4_BLOCK_ZERO() 	\
-	{.lb_id = 0, .data = 0}
+#define EXT4_BLOCK_ZERO()   \
+    {.lb_id = 0, .data = 0}
 
 /**@brief   Single block descriptor*/
 struct ext4_block {
-	/**@brief   Logical block ID*/
-	uint64_t lb_id;
+    /**@brief   Logical block ID*/
+    uint64_t lb_id;
 
-	/**@brief   Buffer */
-	struct ext4_buf *buf;
+    /**@brief   Buffer */
+    struct ext4_buf *buf;
 
-	/**@brief   Data buffer.*/
-	uint8_t *data;
+    /**@brief   Data buffer.*/
+    uint8_t *data;
 };
 
 struct ext4_bcache;
 
 /**@brief   Single block descriptor*/
 struct ext4_buf {
-	/**@brief   Flags*/
-	int flags;
+    /**@brief   Flags*/
+    int flags;
 
-	/**@brief   Logical block address*/
-	uint64_t lba;
+    /**@brief   Logical block address*/
+    uint64_t lba;
 
-	/**@brief   Data buffer.*/
-	uint8_t *data;
+    /**@brief   Data buffer.*/
+    uint8_t *data;
 
-	/**@brief   LRU priority. (unused) */
-	uint32_t lru_prio;
+    /**@brief   LRU priority. (unused) */
+    uint32_t lru_prio;
 
-	/**@brief   LRU id.*/
-	uint32_t lru_id;
+    /**@brief   LRU id.*/
+    uint32_t lru_id;
 
-	/**@brief   Reference count table*/
-	uint32_t refctr;
+    /**@brief   Reference count table*/
+    uint32_t refctr;
 
-	/**@brief   The block cache this buffer belongs to. */
-	struct ext4_bcache *bc;
+    /**@brief   The block cache this buffer belongs to. */
+    struct ext4_bcache *bc;
 
-	/**@brief   Whether or not buffer is on dirty list.*/
-	bool on_dirty_list;
+    /**@brief   Whether or not buffer is on dirty list.*/
+    bool on_dirty_list;
 
-	/**@brief   LBA tree node*/
-	RB_ENTRY(ext4_buf) lba_node;
+    /**@brief   LBA tree node*/
+    RB_ENTRY(ext4_buf) lba_node;
 
-	/**@brief   LRU tree node*/
-	RB_ENTRY(ext4_buf) lru_node;
+    /**@brief   LRU tree node*/
+    RB_ENTRY(ext4_buf) lru_node;
 
-	/**@brief   Dirty list node*/
-	SLIST_ENTRY(ext4_buf) dirty_node;
+    /**@brief   Dirty list node*/
+    SLIST_ENTRY(ext4_buf) dirty_node;
 
-	/**@brief   Callback routine after a disk-write operation.
-	 * @param   bc block cache descriptor
-	 * @param   buf buffer descriptor
-	 * @param   standard error code returned by bdev->bwrite()
-	 * @param   arg argument passed to this routine*/
-	void (*end_write)(struct ext4_bcache *bc,
-			  struct ext4_buf *buf,
-			  int res,
-			  void *arg);
+    /**@brief   Callback routine after a disk-write operation.
+     * @param   bc block cache descriptor
+     * @param   buf buffer descriptor
+     * @param   standard error code returned by bdev->bwrite()
+     * @param   arg argument passed to this routine*/
+    void (*end_write)(struct ext4_bcache *bc,
+              struct ext4_buf *buf,
+              int res,
+              void *arg);
 
-	/**@brief   argument passed to end_write() callback.*/
-	void *end_write_arg;
+    /**@brief   argument passed to end_write() callback.*/
+    void *end_write_arg;
 };
 
 /**@brief   Block cache descriptor*/
 struct ext4_bcache {
 
-	/**@brief   Item count in block cache*/
-	uint32_t cnt;
+    /**@brief   Item count in block cache*/
+    uint32_t cnt;
 
-	/**@brief   Item size in block cache*/
-	uint32_t itemsize;
+    /**@brief   Item size in block cache*/
+    uint32_t itemsize;
 
-	/**@brief   Last recently used counter*/
-	uint32_t lru_ctr;
+    /**@brief   Last recently used counter*/
+    uint32_t lru_ctr;
 
-	/**@brief   Currently referenced datablocks*/
-	uint32_t ref_blocks;
+    /**@brief   Currently referenced datablocks*/
+    uint32_t ref_blocks;
 
-	/**@brief   Maximum referenced datablocks*/
-	uint32_t max_ref_blocks;
+    /**@brief   Maximum referenced datablocks*/
+    uint32_t max_ref_blocks;
 
-	/**@brief   The blockdev binded to this block cache*/
-	struct ext4_blockdev *bdev;
+    /**@brief   The blockdev binded to this block cache*/
+    struct ext4_blockdev *bdev;
 
-	/**@brief   The cache should not be shaked */
-	bool dont_shake;
+    /**@brief   The cache should not be shaked */
+    bool dont_shake;
 
-	/**@brief   A tree holding all bufs*/
-	RB_HEAD(ext4_buf_lba, ext4_buf) lba_root;
+    /**@brief   A tree holding all bufs*/
+    RB_HEAD(ext4_buf_lba, ext4_buf) lba_root;
 
-	/**@brief   A tree holding unreferenced bufs*/
-	RB_HEAD(ext4_buf_lru, ext4_buf) lru_root;
+    /**@brief   A tree holding unreferenced bufs*/
+    RB_HEAD(ext4_buf_lru, ext4_buf) lru_root;
 
-	/**@brief   A singly-linked list holding dirty buffers*/
-	SLIST_HEAD(ext4_buf_dirty, ext4_buf) dirty_list;
+    /**@brief   A singly-linked list holding dirty buffers*/
+    SLIST_HEAD(ext4_buf_dirty, ext4_buf) dirty_list;
 };
 
 /**@brief buffer state bits
  *
- *  - BC♡UPTODATE: Buffer contains valid data.
+ *  - BCâ™¡UPTODATE: Buffer contains valid data.
  *  - BC_DIRTY: Buffer is dirty.
  *  - BC_FLUSH: Buffer will be immediately flushed,
  *              when no one references it.
@@ -158,29 +158,29 @@ struct ext4_bcache {
  *            reaches zero.
  */
 enum bcache_state_bits {
-	BC_UPTODATE,
-	BC_DIRTY,
-	BC_FLUSH,
-	BC_TMP
+    BC_UPTODATE,
+    BC_DIRTY,
+    BC_FLUSH,
+    BC_TMP
 };
 
 #define ext4_bcache_set_flag(buf, b)    \
-	(buf)->flags |= 1 << (b)
+    (buf)->flags |= 1 << (b)
 
 #define ext4_bcache_clear_flag(buf, b)    \
-	(buf)->flags &= ~(1 << (b))
+    (buf)->flags &= ~(1 << (b))
 
 #define ext4_bcache_test_flag(buf, b)    \
-	(((buf)->flags & (1 << (b))) >> (b))
+    (((buf)->flags & (1 << (b))) >> (b))
 
 static inline void ext4_bcache_set_dirty(struct ext4_buf *buf) {
-	ext4_bcache_set_flag(buf, BC_UPTODATE);
-	ext4_bcache_set_flag(buf, BC_DIRTY);
+    ext4_bcache_set_flag(buf, BC_UPTODATE);
+    ext4_bcache_set_flag(buf, BC_DIRTY);
 }
 
 static inline void ext4_bcache_clear_dirty(struct ext4_buf *buf) {
-	ext4_bcache_clear_flag(buf, BC_UPTODATE);
-	ext4_bcache_clear_flag(buf, BC_DIRTY);
+    ext4_bcache_clear_flag(buf, BC_UPTODATE);
+    ext4_bcache_clear_flag(buf, BC_DIRTY);
 }
 
 /**@brief   Increment reference counter of buf by 1.*/
@@ -194,10 +194,10 @@ static inline void ext4_bcache_clear_dirty(struct ext4_buf *buf) {
  * @param   buf buffer descriptor */
 static inline void
 ext4_bcache_insert_dirty_node(struct ext4_bcache *bc, struct ext4_buf *buf) {
-	if (!buf->on_dirty_list) {
-		SLIST_INSERT_HEAD(&bc->dirty_list, buf, dirty_node);
-		buf->on_dirty_list = true;
-	}
+    if (!buf->on_dirty_list) {
+        SLIST_INSERT_HEAD(&bc->dirty_list, buf, dirty_node);
+        buf->on_dirty_list = true;
+    }
 }
 
 /**@brief   Remove buffer to dirty cache list
@@ -205,10 +205,10 @@ ext4_bcache_insert_dirty_node(struct ext4_bcache *bc, struct ext4_buf *buf) {
  * @param   buf buffer descriptor */
 static inline void
 ext4_bcache_remove_dirty_node(struct ext4_bcache *bc, struct ext4_buf *buf) {
-	if (buf->on_dirty_list) {
-		SLIST_REMOVE(&bc->dirty_list, buf, ext4_buf, dirty_node);
-		buf->on_dirty_list = false;
-	}
+    if (buf->on_dirty_list) {
+        SLIST_REMOVE(&bc->dirty_list, buf, ext4_buf, dirty_node);
+        buf->on_dirty_list = false;
+    }
 }
 
 
@@ -218,7 +218,7 @@ ext4_bcache_remove_dirty_node(struct ext4_bcache *bc, struct ext4_buf *buf) {
  * @param   itemsize single item size (in bytes)
  * @return  standard error code*/
 int ext4_bcache_init_dynamic(struct ext4_bcache *bc, uint32_t cnt,
-			     uint32_t itemsize);
+                 uint32_t itemsize);
 
 /**@brief   Do cleanup works on block cache.
  * @param   bc block cache descriptor.*/
@@ -243,15 +243,15 @@ void ext4_bcache_drop_buf(struct ext4_bcache *bc, struct ext4_buf *buf);
  * @param   bc block cache descriptor
  * @param   buf buffer*/
 void ext4_bcache_invalidate_buf(struct ext4_bcache *bc,
-				struct ext4_buf *buf);
+                struct ext4_buf *buf);
 
 /**@brief   Invalidate a range of buffers.
  * @param   bc block cache descriptor
  * @param   from starting lba
  * @param   cnt block counts*/
 void ext4_bcache_invalidate_lba(struct ext4_bcache *bc,
-				uint64_t from,
-				uint32_t cnt);
+                uint64_t from,
+                uint32_t cnt);
 
 /**@brief   Find existing buffer from block cache memory.
  *          Unreferenced block allocation is based on LRU
@@ -262,7 +262,7 @@ void ext4_bcache_invalidate_lba(struct ext4_bcache *bc,
  * @return  block cache buffer */
 struct ext4_buf *
 ext4_bcache_find_get(struct ext4_bcache *bc, struct ext4_block *b,
-		     uint64_t lba);
+             uint64_t lba);
 
 /**@brief   Allocate block from block cache memory.
  *          Unreferenced block allocation is based on LRU
@@ -272,7 +272,7 @@ ext4_bcache_find_get(struct ext4_bcache *bc, struct ext4_block *b,
  * @param   is_new block is new (needs to be read)
  * @return  standard error code*/
 int ext4_bcache_alloc(struct ext4_bcache *bc, struct ext4_block *b,
-		      bool *is_new);
+              bool *is_new);
 
 /**@brief   Free block from cache memory (decrement reference counter).
  * @param   bc block cache descriptor

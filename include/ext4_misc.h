@@ -53,28 +53,28 @@ extern "C" {
 
 static inline uint64_t reorder64(uint64_t n)
 {
-	return  ((n & 0xff) << 56) |
-		((n & 0xff00) << 40) |
-		((n & 0xff0000) << 24) |
-		((n & 0xff000000LL) << 8) |
-		((n & 0xff00000000LL) >> 8) |
-		((n & 0xff0000000000LL) >> 24) |
-		((n & 0xff000000000000LL) >> 40) |
-		((n & 0xff00000000000000LL) >> 56);
+    return  ((n & 0xff) << 56) |
+        ((n & 0xff00) << 40) |
+        ((n & 0xff0000) << 24) |
+        ((n & 0xff000000LL) << 8) |
+        ((n & 0xff00000000LL) >> 8) |
+        ((n & 0xff0000000000LL) >> 24) |
+        ((n & 0xff000000000000LL) >> 40) |
+        ((n & 0xff00000000000000LL) >> 56);
 }
 
 static inline uint32_t reorder32(uint32_t n)
 {
-	return  ((n & 0xff) << 24) |
-		((n & 0xff00) << 8) |
-		((n & 0xff0000) >> 8) |
-		((n & 0xff000000) >> 24);
+    return  ((n & 0xff) << 24) |
+        ((n & 0xff00) << 8) |
+        ((n & 0xff0000) >> 8) |
+        ((n & 0xff000000) >> 24);
 }
 
 static inline uint16_t reorder16(uint16_t n)
 {
-	return  ((n & 0xff) << 8) |
-		((n & 0xff00) >> 8);
+    return  ((n & 0xff) << 8) |
+        ((n & 0xff00) >> 8);
 }
 
 #ifdef CONFIG_BIG_ENDIAN
@@ -103,16 +103,16 @@ static inline uint16_t reorder16(uint16_t n)
 #define ext4_get8(s, f) (s)->f
 
 #define ext4_set32(s, f, v)                                                    \
-	do {                                                                   \
-		(s)->f = to_le32(v);                                           \
-	} while (0)
+    do {                                                                   \
+        (s)->f = to_le32(v);                                           \
+    } while (0)
 #define ext4_set16(s, f, v)                                                    \
-	do {                                                                   \
-		(s)->f = to_le16(v);                                           \
-	} while (0)
+    do {                                                                   \
+        (s)->f = to_le16(v);                                           \
+    } while (0)
 #define ext4_set8                                                              \
-	(s, f, v) do { (s)->f = (v); }                                         \
-	while (0)
+    (s, f, v) do { (s)->f = (v); }                                         \
+    while (0)
 
 /****************************Access macros to jbd2 structures*****************/
 
@@ -121,28 +121,28 @@ static inline uint16_t reorder16(uint16_t n)
 #define jbd_get8(s, f) (s)->f
 
 #define jbd_set32(s, f, v)                                                    \
-	do {                                                                   \
-		(s)->f = to_be32(v);                                           \
-	} while (0)
+    do {                                                                   \
+        (s)->f = to_be32(v);                                           \
+    } while (0)
 #define jbd_set16(s, f, v)                                                    \
-	do {                                                                   \
-		(s)->f = to_be16(v);                                           \
-	} while (0)
+    do {                                                                   \
+        (s)->f = to_be16(v);                                           \
+    } while (0)
 #define jbd_set8                                                              \
-	(s, f, v) do { (s)->f = (v); }                                         \
-	while (0)
+    (s, f, v) do { (s)->f = (v); }                                         \
+    while (0)
 
 #ifdef __GNUC__
- #ifndef __unused
- #define __unused __attribute__ ((__unused__))
+ #ifndef __ext4_unused // "__unused" conflicts with riscv`s include/bits/signal.h
+ #define __ext4_unused __attribute__ ((__unused__))
  #endif
 #else
- #define __unused
+ #define __ext4_unused
 #endif
 
 #ifndef offsetof
-#define offsetof(type, field) 		\
-	((size_t)(&(((type *)0)->field)))
+#define offsetof(type, field)       \
+    ((size_t)(&(((type *)0)->field)))
 #endif
 
 #ifdef __cplusplus

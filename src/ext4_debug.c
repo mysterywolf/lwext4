@@ -46,17 +46,17 @@ static uint32_t debug_mask;
 
 void ext4_dmask_set(uint32_t m)
 {
-	debug_mask |= m;
+    debug_mask |= m;
 }
 
 void ext4_dmask_clr(uint32_t m)
 {
-	debug_mask &= ~m;
+    debug_mask &= ~m;
 }
 
 uint32_t ext4_dmask_get(void)
 {
-	return debug_mask;
+    return debug_mask;
 }
 
 

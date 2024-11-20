@@ -47,110 +47,110 @@ extern "C" {
 #include <stdint.h>
 
 struct ext4_blockdev_iface {
-	/**@brief   Open device function
-	 * @param   bdev block device.*/
-	int (*open)(struct ext4_blockdev *bdev);
+    /**@brief   Open device function
+     * @param   bdev block device.*/
+    int (*open)(struct ext4_blockdev *bdev);
 
-	/**@brief   Block read function.
-	 * @param   bdev block device
-	 * @param   buf output buffer
-	 * @param   blk_id block id
-	 * @param   blk_cnt block count*/
-	int (*bread)(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id,
-		     uint32_t blk_cnt);
+    /**@brief   Block read function.
+     * @param   bdev block device
+     * @param   buf output buffer
+     * @param   blk_id block id
+     * @param   blk_cnt block count*/
+    int (*bread)(struct ext4_blockdev *bdev, void *buf, uint64_t blk_id,
+             uint32_t blk_cnt);
 
-	/**@brief   Block write function.
-	 * @param   buf input buffer
-	 * @param   blk_id block id
-	 * @param   blk_cnt block count*/
-	int (*bwrite)(struct ext4_blockdev *bdev, const void *buf,
-		      uint64_t blk_id, uint32_t blk_cnt);
+    /**@brief   Block write function.
+     * @param   buf input buffer
+     * @param   blk_id block id
+     * @param   blk_cnt block count*/
+    int (*bwrite)(struct ext4_blockdev *bdev, const void *buf,
+              uint64_t blk_id, uint32_t blk_cnt);
 
-	/**@brief   Close device function.
-	 * @param   bdev block device.*/
-	int (*close)(struct ext4_blockdev *bdev);
+    /**@brief   Close device function.
+     * @param   bdev block device.*/
+    int (*close)(struct ext4_blockdev *bdev);
 
-	/**@brief   Lock block device. Required in multi partition mode
-	 *          operations. Not mandatory field.
-	 * @param   bdev block device.*/
-	int (*lock)(struct ext4_blockdev *bdev);
+    /**@brief   Lock block device. Required in multi partition mode
+     *          operations. Not mandatory field.
+     * @param   bdev block device.*/
+    int (*lock)(struct ext4_blockdev *bdev);
 
-	/**@brief   Unlock block device. Required in multi partition mode
-	 *          operations. Not mandatory field.
-	 * @param   bdev block device.*/
-	int (*unlock)(struct ext4_blockdev *bdev);
+    /**@brief   Unlock block device. Required in multi partition mode
+     *          operations. Not mandatory field.
+     * @param   bdev block device.*/
+    int (*unlock)(struct ext4_blockdev *bdev);
 
-	/**@brief   Block size (bytes): physical*/
-	uint32_t ph_bsize;
+    /**@brief   Block size (bytes): physical*/
+    uint32_t ph_bsize;
 
-	/**@brief   Block count: physical*/
-	uint64_t ph_bcnt;
+    /**@brief   Block count: physical*/
+    uint64_t ph_bcnt;
 
-	/**@brief   Block size buffer: physical*/
-	uint8_t *ph_bbuf;
+    /**@brief   Block size buffer: physical*/
+    uint8_t *ph_bbuf;
 
-	/**@brief   Reference counter to block device interface*/
-	uint32_t ph_refctr;
+    /**@brief   Reference counter to block device interface*/
+    uint32_t ph_refctr;
 
-	/**@brief   Physical read counter*/
-	uint32_t bread_ctr;
+    /**@brief   Physical read counter*/
+    uint32_t bread_ctr;
 
-	/**@brief   Physical write counter*/
-	uint32_t bwrite_ctr;
+    /**@brief   Physical write counter*/
+    uint32_t bwrite_ctr;
 
-	/**@brief   User data pointer*/
-	void* p_user;
+    /**@brief   User data pointer*/
+    void* p_user;
 };
 
 /**@brief   Definition of the simple block device.*/
 struct ext4_blockdev {
-	/**@brief Block device interface*/
-	struct ext4_blockdev_iface *bdif;
+    /**@brief Block device interface*/
+    struct ext4_blockdev_iface *bdif;
 
-	/**@brief Offset in bdif. For multi partition mode.*/
-	uint64_t part_offset;
+    /**@brief Offset in bdif. For multi partition mode.*/
+    uint64_t part_offset;
 
-	/**@brief Part size in bdif. For multi partition mode.*/
-	uint64_t part_size;
+    /**@brief Part size in bdif. For multi partition mode.*/
+    uint64_t part_size;
 
-	/**@brief   Block cache.*/
-	struct ext4_bcache *bc;
+    /**@brief   Block cache.*/
+    struct ext4_bcache *bc;
 
-	/**@brief   Block size (bytes) logical*/
-	uint32_t lg_bsize;
+    /**@brief   Block size (bytes) logical*/
+    uint32_t lg_bsize;
 
-	/**@brief   Block count: logical*/
-	uint64_t lg_bcnt;
+    /**@brief   Block count: logical*/
+    uint64_t lg_bcnt;
 
-	/**@brief   Cache write back mode reference counter*/
-	uint32_t cache_write_back;
+    /**@brief   Cache write back mode reference counter*/
+    uint32_t cache_write_back;
 
-	/**@brief   The filesystem this block device belongs to. */
-	struct ext4_fs *fs;
+    /**@brief   The filesystem this block device belongs to. */
+    struct ext4_fs *fs;
 
-	void *journal;
+    void *journal;
 };
 
 /**@brief   Static initialization of the block device.*/
 #define EXT4_BLOCKDEV_STATIC_INSTANCE(__name, __bsize, __bcnt, __open, __bread,\
-				      __bwrite, __close, __lock, __unlock)     \
-	static uint8_t __name##_ph_bbuf[(__bsize)];                            \
-	static struct ext4_blockdev_iface __name##_iface = {                   \
-		.open = __open,                                                \
-		.bread = __bread,                                              \
-		.bwrite = __bwrite,                                            \
-		.close = __close,                                              \
-		.lock = __lock,                                                \
-		.unlock = __unlock,                                            \
-		.ph_bsize = __bsize,                                           \
-		.ph_bcnt = __bcnt,                                             \
-		.ph_bbuf = __name##_ph_bbuf,                                   \
-	};								       \
-	static struct ext4_blockdev __name = {                                 \
-		.bdif = &__name##_iface,                                       \
-		.part_offset = 0,                                              \
-		.part_size =  (__bcnt) * (__bsize),                            \
-	}
+                      __bwrite, __close, __lock, __unlock)     \
+    static uint8_t __name##_ph_bbuf[(__bsize)];                            \
+    static struct ext4_blockdev_iface __name##_iface = {                   \
+        .open = __open,                                                \
+        .bread = __bread,                                              \
+        .bwrite = __bwrite,                                            \
+        .close = __close,                                              \
+        .lock = __lock,                                                \
+        .unlock = __unlock,                                            \
+        .ph_bsize = __bsize,                                           \
+        .ph_bcnt = __bcnt,                                             \
+        .ph_bbuf = __name##_ph_bbuf,                                   \
+    };                                     \
+    static struct ext4_blockdev __name = {                                 \
+        .bdif = &__name##_iface,                                       \
+        .part_offset = 0,                                              \
+        .part_size =  (__bcnt) * (__bsize),                            \
+    }
 
 /**@brief   Block device initialization.
  * @param   bdev block device descriptor
@@ -192,7 +192,7 @@ void ext4_block_set_lb_size(struct ext4_blockdev *bdev, uint32_t lb_bsize);
  * @param   lba logical block address
  * @return  standard error code*/
 int ext4_block_get_noread(struct ext4_blockdev *bdev, struct ext4_block *b,
-			  uint64_t lba);
+              uint64_t lba);
 
 /**@brief   Block get function (through cache).
  * @param   bdev block device descriptor
@@ -200,7 +200,7 @@ int ext4_block_get_noread(struct ext4_blockdev *bdev, struct ext4_block *b,
  * @param   lba logical block address
  * @return  standard error code*/
 int ext4_block_get(struct ext4_blockdev *bdev, struct ext4_block *b,
-		   uint64_t lba);
+           uint64_t lba);
 
 /**@brief   Block set procedure (through cache).
  * @param   bdev block device descriptor
@@ -214,7 +214,7 @@ int ext4_block_set(struct ext4_blockdev *bdev, struct ext4_block *b);
  * @param   lba logical block address
  * @return  standard error code*/
 int ext4_blocks_get_direct(struct ext4_blockdev *bdev, void *buf, uint64_t lba,
-			   uint32_t cnt);
+               uint32_t cnt);
 
 /**@brief   Block write procedure (without cache)
  * @param   bdev block device descriptor
@@ -222,7 +222,7 @@ int ext4_blocks_get_direct(struct ext4_blockdev *bdev, void *buf, uint64_t lba,
  * @param   lba logical block address
  * @return  standard error code*/
 int ext4_blocks_set_direct(struct ext4_blockdev *bdev, const void *buf,
-			   uint64_t lba, uint32_t cnt);
+               uint64_t lba, uint32_t cnt);
 
 /**@brief   Write to block device (by direct address).
  * @param   bdev block device descriptor
@@ -231,7 +231,7 @@ int ext4_blocks_set_direct(struct ext4_blockdev *bdev, const void *buf,
  * @param   len length of the write buffer
  * @return  standard error code*/
 int ext4_block_writebytes(struct ext4_blockdev *bdev, uint64_t off,
-			  const void *buf, uint32_t len);
+              const void *buf, uint32_t len);
 
 /**@brief   Read freom block device (by direct address).
  * @param   bdev block device descriptor
@@ -240,7 +240,7 @@ int ext4_block_writebytes(struct ext4_blockdev *bdev, uint64_t off,
  * @param   len length of the write buffer
  * @return  standard error code*/
 int ext4_block_readbytes(struct ext4_blockdev *bdev, uint64_t off, void *buf,
-			 uint32_t len);
+             uint32_t len);
 
 /**@brief   Flush all dirty buffers to disk
  * @param   bdev block device descriptor

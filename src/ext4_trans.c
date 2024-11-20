@@ -46,60 +46,60 @@
 
 int ext4_trans_set_block_dirty(struct ext4_buf *buf)
 {
-	int r = EOK;
+    int r = EOK;
 #if CONFIG_JOURNALING_ENABLE
-	struct ext4_fs *fs = buf->bc->bdev->fs;
-	struct ext4_block block = {
-		.lb_id = buf->lba,
-		.data = buf->data,
-		.buf = buf
-	};
+    struct ext4_fs *fs = buf->bc->bdev->fs;
+    struct ext4_block block = {
+        .lb_id = buf->lba,
+        .data = buf->data,
+        .buf = buf
+    };
 
-	if (fs->jbd_journal && fs->curr_trans) {
-		struct jbd_trans *trans = fs->curr_trans;
-		return jbd_trans_set_block_dirty(trans, &block);
-	}
+    if (fs->jbd_journal && fs->curr_trans) {
+        struct jbd_trans *trans = fs->curr_trans;
+        return jbd_trans_set_block_dirty(trans, &block);
+    }
 #endif
-	ext4_bcache_set_dirty(buf);
-	return r;
+    ext4_bcache_set_dirty(buf);
+    return r;
 }
 
 int ext4_trans_block_get_noread(struct ext4_blockdev *bdev,
-			  struct ext4_block *b,
-			  uint64_t lba)
+              struct ext4_block *b,
+              uint64_t lba)
 {
-	int r = ext4_block_get_noread(bdev, b, lba);
-	if (r != EOK)
-		return r;
+    int r = ext4_block_get_noread(bdev, b, lba);
+    if (r != EOK)
+        return r;
 
-	return r;
+    return r;
 }
 
 int ext4_trans_block_get(struct ext4_blockdev *bdev,
-		   struct ext4_block *b,
-		   uint64_t lba)
+           struct ext4_block *b,
+           uint64_t lba)
 {
-	int r = ext4_block_get(bdev, b, lba);
-	if (r != EOK)
-		return r;
+    int r = ext4_block_get(bdev, b, lba);
+    if (r != EOK)
+        return r;
 
-	return r;
+    return r;
 }
 
-int ext4_trans_try_revoke_block(struct ext4_blockdev *bdev __unused,
-			        uint64_t lba __unused)
+int ext4_trans_try_revoke_block(struct ext4_blockdev *bdev __ext4_unused,
+                    uint64_t lba __ext4_unused)
 {
-	int r = EOK;
+    int r = EOK;
 #if CONFIG_JOURNALING_ENABLE
-	struct ext4_fs *fs = bdev->fs;
-	if (fs->jbd_journal && fs->curr_trans) {
-		struct jbd_trans *trans = fs->curr_trans;
-		r = jbd_trans_try_revoke_block(trans, lba);
-	} else if (fs->jbd_journal) {
-		r = ext4_block_flush_lba(fs->bdev, lba);
-	}
+    struct ext4_fs *fs = bdev->fs;
+    if (fs->jbd_journal && fs->curr_trans) {
+        struct jbd_trans *trans = fs->curr_trans;
+        r = jbd_trans_try_revoke_block(trans, lba);
+    } else if (fs->jbd_journal) {
+        r = ext4_block_flush_lba(fs->bdev, lba);
+    }
 #endif
-	return r;
+    return r;
 }
 
 /**
