@@ -285,6 +285,21 @@ int ext4_bcache_free(struct ext4_bcache *bc, struct ext4_block *b)
     /*Just decrease reference counter*/
     ext4_bcache_dec_ref(buf);
 
+    if (buf->refctr && buf->refctr == buf->read_refctr) {
+        /* This buffer is ready to be flushed. */
+        if (ext4_bcache_test_flag(buf, BC_DIRTY) &&
+            ext4_bcache_test_flag(buf, BC_UPTODATE)) {
+            if (bc->bdev->cache_write_back &&
+                !ext4_bcache_test_flag(buf, BC_FLUSH) &&
+                !ext4_bcache_test_flag(buf, BC_TMP))
+                ext4_bcache_insert_dirty_node(bc, buf);
+            else {
+                ext4_block_flush_buf(bc->bdev, buf);
+                ext4_bcache_clear_flag(buf, BC_FLUSH);
+            }
+        }
+    }
+
     /* We are the last one touching this buffer, do the cleanups. */
     if (!buf->refctr) {
         RB_INSERT(ext4_buf_lru, &bc->lru_root, buf);

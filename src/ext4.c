@@ -53,48 +53,10 @@
 #include <ext4_xattr.h>
 #include <ext4_journal.h>
 
+#include "ext4_mp.h"
 
 #include <stdlib.h>
 #include <string.h>
-
-/**@brief   Mount point OS dependent lock*/
-#define EXT4_MP_LOCK(_m)                                                       \
-    do {                                                                   \
-        if ((_m)->os_locks)                                            \
-            (_m)->os_locks->lock();                                \
-    } while (0)
-
-/**@brief   Mount point OS dependent unlock*/
-#define EXT4_MP_UNLOCK(_m)                                                     \
-    do {                                                                   \
-        if ((_m)->os_locks)                                            \
-            (_m)->os_locks->unlock();                              \
-    } while (0)
-
-/**@brief   Mount point descriptor.*/
-struct ext4_mountpoint {
-
-    /**@brief   Mount done flag.*/
-    bool mounted;
-
-    /**@brief   Mount point name (@ref ext4_mount)*/
-    char name[CONFIG_EXT4_MAX_MP_NAME + 1];
-
-    /**@brief   OS dependent lock/unlock functions.*/
-    const struct ext4_lock *os_locks;
-
-    /**@brief   Ext4 filesystem internals.*/
-    struct ext4_fs fs;
-
-    /**@brief   JBD fs.*/
-    struct jbd_fs jbd_fs;
-
-    /**@brief   Journal.*/
-    struct jbd_journal jbd_journal;
-
-    /**@brief   Block cache.*/
-    struct ext4_bcache bc;
-};
 
 /**@brief   Mountpoints.*/
 static struct ext4_mountpoint s_mp[CONFIG_EXT4_MOUNTPOINTS_COUNT];
@@ -323,8 +285,8 @@ int ext4_mount(struct ext4_blockdev *bd, const char *mount_point,
             break;
         }
 
-        if (!strcmp(s_mp[i].name, mount_point))
-            return EOK;
+        /*if (!strcmp(s_mp[i].name, mount_point))
+            return EOK;*/
     }
 
     if (!mp)
@@ -364,7 +326,37 @@ int ext4_mount(struct ext4_blockdev *bd, const char *mount_point,
 
     bd->fs = &mp->fs;
     mp->mounted = 1;
+    bd->journal = (void *)mp;
+
+    ext4_cache_write_back(mp->name, true);
+
     return r;
+}
+
+int ext4_umount_mp(struct ext4_mountpoint *mp)
+{
+    int ret = ENODEV;
+
+    if (mp && mp->mounted)
+    {
+        ext4_cache_write_back(mp->name, false);
+
+        ret = ext4_fs_fini(&mp->fs);
+        if (ret == EOK)
+        {
+            mp->mounted = 0;
+
+            ext4_bcache_cleanup(mp->fs.bdev->bc);
+            ext4_bcache_fini_dynamic(mp->fs.bdev->bc);
+
+            ret = ext4_block_fini(mp->fs.bdev);
+        }
+
+        mp->fs.bdev->fs = NULL;
+        memset(mp, 0, sizeof(struct ext4_mountpoint));
+    }
+
+    return ret;
 }
 
 int ext4_umount(const char *mount_point)
@@ -383,19 +375,8 @@ int ext4_umount(const char *mount_point)
     if (!mp)
         return ENODEV;
 
-    r = ext4_fs_fini(&mp->fs);
-    if (r != EOK)
-        goto Finish;
+    r = ext4_umount_mp(mp);
 
-    mp->mounted = 0;
-
-    ext4_bcache_cleanup(mp->fs.bdev->bc);
-    ext4_bcache_fini_dynamic(mp->fs.bdev->bc);
-
-    r = ext4_block_fini(mp->fs.bdev);
-Finish:
-    mp->fs.bdev->fs = NULL;
-    memset(mp, 0, sizeof(struct ext4_mountpoint));
     return r;
 }
 
@@ -890,14 +871,16 @@ static int ext4_generic_open2(ext4_file *f, const char *path, int flags,
     f->flags = flags;
 
     /*Skip mount point*/
-    path += strlen(mp->name);
+    len = strlen(mp->name);
+    path += len;
     if (path[0] == '/')
     {
         path += 1;
+        len += 1;
     }
 
     if (name_off)
-        *name_off = strlen(mp->name);
+        *name_off = len;
 
     /*Load root*/
     r = ext4_fs_get_inode_ref(fs, EXT4_INODE_ROOT_INDEX, &ref);
@@ -1542,6 +1525,10 @@ int ext4_fclose(ext4_file *file)
 {
     ext4_assert(file && file->mp);
 
+    EXT4_MP_LOCK(file->mp);
+    ext4_block_cache_flush(file->mp->fs.bdev);
+    EXT4_MP_UNLOCK(file->mp);
+
     file->mp = 0;
     file->flags = 0;
     file->inode = 0;
@@ -1694,7 +1681,7 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt)
         r = ext4_fs_get_inode_dblk_idx(&ref, iblock_idx, &fblock, true);
         if (r != EOK)
             goto Finish;
-        
+
         /* Do we get an unwritten range? */
         if (fblock != 0) {
             uint64_t off = fblock * block_size + unalg;
@@ -1737,8 +1724,14 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt)
             fblock_count++;
         }
 
-        r = ext4_blocks_get_direct(file->mp->fs.bdev, u8_buf, fblock_start,
+        if (fblock_start == 0) {
+            memset(u8_buf, 0, block_size * fblock_count);
+            r = EOK;
+        } else {
+            r = ext4_blocks_get_direct(file->mp->fs.bdev, u8_buf, fblock_start,
                        fblock_count);
+        }
+
         if (r != EOK)
             goto Finish;
 
@@ -1769,7 +1762,7 @@ int ext4_fread(ext4_file *file, void *buf, size_t size, size_t *rcnt)
         if (rcnt)
             *rcnt += size;
     }
-    
+
 
 Finish:
     ext4_fs_put_inode_ref(&ref);
@@ -1822,6 +1815,11 @@ int ext4_fwrite(ext4_file *file, const void *buf, size_t size, size_t *wcnt)
 
     /*Sync file size*/
     file->fsize = ext4_inode_get_size(sb, ref.inode);
+    if (file->fpos > file->fsize) {
+        file->fsize = file->fpos;
+        ext4_inode_set_size(ref.inode, file->fsize);
+        ref.dirty = true;
+    }
     block_size = ext4_sb_get_block_size(sb);
 
     iblock_last = (uint32_t)((file->fpos + size) / block_size);
@@ -1967,29 +1965,30 @@ Finish:
 
 int ext4_fseek(ext4_file *file, int64_t offset, uint32_t origin)
 {
+    int ret = EOK;
+    off_t new_offset = 0;
+
     switch (origin) {
     case SEEK_SET:
-        if (offset < 0)
-            return EINVAL;
+        new_offset = offset;
+        break;
 
-        file->fpos = offset;
-        return EOK;
     case SEEK_CUR:
-        if ((offset < 0 && (uint64_t)(-offset) > file->fpos) ||
-            (offset > 0 &&
-             (uint64_t)offset > (file->fsize - file->fpos)))
-            return EINVAL;
+        new_offset = file->fpos + offset;
+        break;
 
-        file->fpos += offset;
-        return EOK;
     case SEEK_END:
-        if (offset < 0 || (uint64_t)offset > file->fsize)
-            return EINVAL;
-
-        file->fpos = file->fsize - offset;
-        return EOK;
+        new_offset = file->fsize + offset;
+        break;
     }
-    return EINVAL;
+
+    if (new_offset < 0) ret = EINVAL;
+    else
+    {
+        file->fpos = new_offset;
+    }
+
+    return ret;
 }
 
 uint64_t ext4_ftell(ext4_file *file)
@@ -2022,6 +2021,8 @@ static int ext4_trans_get_inode_ref(const char *path,
         return r;
     }
 
+    ext4_bcache_inc_read_ref(inode_ref->block.buf);
+
     return r;
 }
 
@@ -2030,6 +2031,7 @@ static int ext4_trans_put_inode_ref(struct ext4_mountpoint *mp,
 {
     int r;
 
+    ext4_bcache_dec_read_ref(inode_ref->block.buf);
     r = ext4_fs_put_inode_ref(inode_ref);
     if (r != EOK)
         ext4_trans_abort(mp);
@@ -2090,6 +2092,34 @@ int ext4_inode_exist(const char *path, int type)
     EXT4_MP_UNLOCK(mp);
 
     return r;
+}
+
+void* ext4_get_inode_ref(const char *path, struct ext4_inode_ref *ref)
+{
+    int ret;
+    struct ext4_mountpoint *mp = ext4_get_mount(path);
+
+    if (!mp)
+        return NULL;
+
+    EXT4_MP_LOCK(mp);
+    ret = ext4_trans_get_inode_ref(path, mp, ref);
+    EXT4_MP_UNLOCK(mp);
+
+    if (ret != EOK) mp = NULL;
+
+    return mp;
+}
+
+int ext4_put_inode_ref(struct ext4_mountpoint *mp, struct ext4_inode_ref *ref)
+{
+    int ret = EOK;
+
+    EXT4_MP_LOCK(mp);
+    ret = ext4_trans_put_inode_ref(mp, ref);
+    EXT4_MP_UNLOCK(mp);
+
+    return ret;
 }
 
 int ext4_mode_set(const char *path, uint32_t mode)

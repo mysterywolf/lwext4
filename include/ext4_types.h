@@ -829,10 +829,11 @@ struct jbd_sb {
 
 #else
 
-#define ext4_malloc  malloc
-#define ext4_calloc  calloc
-#define ext4_realloc realloc
-#define ext4_free    free
+#include <rtthread.h>
+#define ext4_malloc(_sz)        rt_malloc(_sz)
+#define ext4_calloc(_cnt, _sz)  rt_calloc(_cnt, _sz)
+#define ext4_realloc(_ptr, _sz) rt_realloc(_ptr, _sz)
+#define ext4_free(_ptr)         rt_free(_ptr)
 
 #endif
 

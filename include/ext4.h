@@ -50,6 +50,8 @@ extern "C" {
 #include <ext4_errno.h>
 #include <ext4_oflags.h>
 #include <ext4_debug.h>
+#include <ext4_inode.h>
+#include <ext4_fs.h>
 
 #include <ext4_blockdev.h>
 
@@ -125,6 +127,13 @@ int ext4_mount(struct ext4_blockdev *bd,
 
 /**@brief   Umount operation.
  *
+ * @param   mount_point Mount point.
+ *
+ * @return  Standard error code */
+int ext4_umount_mp(struct ext4_mountpoint *mp);
+
+/**@brief   Umount operation.
+ *
  * @param   mount_pount Mount point.
  *
  * @return  Standard error code */
@@ -140,7 +149,7 @@ int ext4_umount(const char *mount_point);
  *
  *              ext4_journal_stop("/");
  *              ext4_umount("/");
- * @param   mount_pount Mount point.
+ * @param   mount_point Mount point.
  *
  * @return  Standard error code. */
 int ext4_journal_start(const char *mount_point);
@@ -148,7 +157,7 @@ int ext4_journal_start(const char *mount_point);
 /**@brief   Stops journaling. Journaling start/stop functions are transparent
  *          and might be used on filesystems without journaling support.
  *
- * @param   mount_pount Mount point name.
+ * @param   mount_point Mount point name.
  *
  * @return  Standard error code. */
 int ext4_journal_stop(const char *mount_point);
@@ -156,7 +165,7 @@ int ext4_journal_stop(const char *mount_point);
 /**@brief   Journal recovery.
  * @warning Must be called after @ref ext4_mount.
  *
- * @param   mount_pount Mount point.
+ * @param   mount_point Mount point.
  *
  * @return Standard error code. */
 int ext4_recover(const char *mount_point);
@@ -178,7 +187,7 @@ struct ext4_mount_stats {
 
 /**@brief   Get file mount point stats.
  *
- * @param   mount_pount Mount point.
+ * @param   mount_point Mount point.
  * @param   stats Filesystem stats.
  *
  * @return Standard error code. */
@@ -187,7 +196,7 @@ int ext4_mount_point_stats(const char *mount_point,
 
 /**@brief   Setup OS lock routines.
  *
- * @param   mount_pount Mount point.
+ * @param   mount_point Mount point.
  * @param   locks  Lock and unlock functions
  *
  * @return Standard error code. */
@@ -196,7 +205,7 @@ int ext4_mount_setup_locks(const char *mount_point,
 
 /**@brief   Acquire the filesystem superblock pointer of a mp.
  *
- * @param   mount_pount Mount point.
+ * @param   mount_point Mount point.
  * @param   sb Superblock handle
  *
  * @return Standard error code. */
@@ -233,7 +242,7 @@ int ext4_get_sblock(const char *mount_point, struct ext4_sblock **sb);
  * Write back mode is useful when you want to create a lot of empty
  * files/directories.
  *
- * @param   mount_pount Mount point.
+ * @param   path Mount point.
  * @param   on Enable/disable cache writeback mode.
  *
  * @return Standard error code. */
@@ -242,7 +251,7 @@ int ext4_cache_write_back(const char *path, bool on);
 
 /**@brief   Force cache flush.
  *
- * @param   mount_pount Mount point.
+ * @param   path Mount point.
  *
  * @return  Standard error code. */
 int ext4_cache_flush(const char *path);
@@ -390,6 +399,9 @@ int ext4_raw_inode_fill(const char *path, uint32_t *ret_ino,
  * @return  Standard error code.*/
 int ext4_inode_exist(const char *path, int type);
 
+void* ext4_get_inode_ref(const char *path, struct ext4_inode_ref *ref);
+int ext4_put_inode_ref(struct ext4_mountpoint *mp, struct ext4_inode_ref *ref);
+
 /**@brief Change file/directory/link mode bits.
  *
  * @param path Path to file/dir/link.
@@ -517,8 +529,8 @@ int ext4_setxattr(const char *path, const char *name, size_t name_len,
  * @param path      Path to file/directory.
  * @param name      Name of the entry to get.
  * @param name_len  Length of @name in bytes.
- * @param data      Data of the entry to get.
- * @param data_size Size of data to get.
+ * @param buf      Data of the entry to get.
+ * @param buf_size Size of data to get.
  *
  * @return  Standard error code.*/
 int ext4_getxattr(const char *path, const char *name, size_t name_len,

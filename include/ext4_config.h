@@ -147,7 +147,7 @@ extern "C" {
 
 /**@brief   Maximum mountpoint count*/
 #ifndef CONFIG_EXT4_MOUNTPOINTS_COUNT
-#define CONFIG_EXT4_MOUNTPOINTS_COUNT 4
+#define CONFIG_EXT4_MOUNTPOINTS_COUNT 20
 #endif
 
 /**@brief   Include open flags from ext4_errno or standard library.*/
